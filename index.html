@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 30px 20px; }
+    button {
+      width: 100%; padding: 18px; margin: 10px 0; font-size: 18px;
+      border: none; border-radius: 10px; color: white;
+    }
+    #checkin { background: #06C755; }
+    #checkout { background: #FF5555; }
+    #status { margin-top: 20px; font-size: 15px; white-space: pre-line; }
+  </style>
+</head>
+<body>
+  <h2>📍 ลงเวลางาน</h2>
+  <button id="checkin">✅ เข้างาน</button>
+  <button id="checkout">🔴 เลิกงาน</button>
+  <div id="status">กำลังเตรียมระบบ...</div>
+
+  <script>
+    const LIFF_ID = 'ใส่ LIFF_ID ของคุณ';
+    // ใส่ Apps Script Web App URL (ตัวเดิมที่ใช้ /exec)
+    const SCRIPT_URL = 'ใส่ Apps Script Web App URL /exec';
+
+    liff.init({ liffId: 2010782987-4mjGpChs }).then(() => {
+      document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
+    }).catch(err => {
+      document.getElementById('status').innerText = 'เกิดข้อผิดพลาด: ' + err;
+    });
+
+    document.getElementById('checkin').onclick = () => submitAttendance('เข้างาน');
+    document.getElementById('checkout').onclick = () => submitAttendance('เลิกงาน');
+
+    function submitAttendance(type) {
+      document.getElementById('status').innerText = 'กำลังดึงตำแหน่ง GPS...';
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const profile = await liff.getProfile();
+
+        const payload = {
+          userId: profile.userId,
+          type: type,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
+
+        document.getElementById('status').innerText = 'กำลังบันทึก...';
+
+        const res = await fetch(https://script.google.com/macros/s/AKfycbygY6ZskSVm0mGjwfP-LpDnP6goYZQlFM5pl55sDRB8bMJ2kgIgYYd6ofquDSeJz_P0/exec, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          document.getElementById('status').innerText =
+            `✅ ${result.message}\nชื่อ: ${result.name}\n${result.dateStr} ${result.timeStr}\nระยะจากออฟฟิศ: ${result.distance}m`;
+        } else {
+          document.getElementById('status').innerText = '❌ ' + result.message;
+        }
+      }, () => {
+        document.getElementById('status').innerText = 'ไม่สามารถดึงตำแหน่งได้ กรุณาเปิด GPS และอนุญาตสิทธิ์ตำแหน่ง';
+      }, { enableHighAccuracy: true, timeout: 10000 });
+    }
+  </script>
+</body>
+</html>
