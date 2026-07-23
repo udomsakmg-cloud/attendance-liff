@@ -12,7 +12,14 @@
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
-    #photoInput { display: none; }
+    #photoInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
