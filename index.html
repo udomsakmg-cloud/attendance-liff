@@ -2,125 +2,95 @@
 <html>
 <head>
   <base target="_top">
+  <meta charset="UTF-8">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; text-align: center; background-color: #f4f6f9; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-    select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-    button { background-color: #06C755; color: white; font-weight: bold; border: none; cursor: pointer; }
-    button:disabled { background-color: #ccc; }
-    #preview { width: 100%; height: auto; border-radius: 8px; margin-top: 10px; display: none; }
-    .user-info { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px; }
-    .user-info img { width: 50px; height: 50px; border-radius: 50%; }
-    .status { margin-top: 10px; font-weight: bold; color: #555; }
+    body { font-family: sans-serif; text-align: center; padding: 20px 15px; }
+    button {
+      width: 100%; padding: 16px; margin: 8px 0; font-size: 17px;
+      border: none; border-radius: 10px; color: white;
+    }
+    #checkin { background: #06C755; }
+    #checkout { background: #FF5555; }
+    #photoInput { display: none; }
+    #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
+    #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
+  <h2>📍 ลงเวลางาน</h2>
+  <input type="file" id="photoInput" accept="image/*" capture="user">
+  <img id="preview">
+  <button id="checkin">✅ เข้างาน</button>
+  <button id="checkout">🔴 เลิกงาน</button>
+  <div id="status">กำลังเตรียมระบบ...</div>
 
-<div class="card">
-  <h2>📍 ลงเวลางาน (Check-in)</h2>
-  
-  <div id="profileContainer" class="user-info" style="display:none;">
-    <img id="pictureUrl" src="" alt="Profile">
-    <span id="displayName" style="font-weight:bold;">กำลังโหลด...</span>
-  </div>
+  <script>
+    const LIFF_ID = '2010782987-4mjGpChs;
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby78bp1iXDRRE3WndJwAX-4jH9xi_ZAIApLT-2hwVoSP1kzQ3RnVy9QlhXu2inUsUee/exec';
 
-  <select id="type">
-    <option value="ลงเวลาเข้างาน (IN)">🟢 ลงเวลาเข้างาน (IN)</option>
-    <option value="ลงเวลาออกงาน (OUT)">🔴 ลงเวลาออกงาน (OUT)</option>
-  </select>
+    let pendingType = null;
 
-  <label style="text-align:left; display:block; margin-top:10px; font-weight:bold;">📸 ถ่ายรูปยืนยันตัวตน:</label>
-  <input type="file" id="camera" accept="image/*" capture="camera" onchange="previewImage(event)" style="margin: 10px 0;">
-  <img id="preview" src="" alt="Preview">
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
+    }).catch(err => {
+      document.getElementById('status').innerText = 'เกิดข้อผิดพลาด: ' + err;
+    });
 
-  <button id="btnSubmit" onclick="submitData()">กดบันทึกเวลา</button>
-  <div id="status" class="status"></div>
-</div>
+    document.getElementById('checkin').onclick = () => startCheckIn('เข้างาน');
+    document.getElementById('checkout').onclick = () => startCheckIn('เลิกงาน');
 
-<script>
-  let lineProfile = null;
-  let imageBase64 = "";
+    function startCheckIn(type) {
+      pendingType = type;
+      document.getElementById('photoInput').click(); // เปิดกล้องถ่ายรูปก่อน
+    }
 
-  // เริ่มต้นทำงาน LIFF
-  window.onload = function() {
-    liff.init({ liffId: "2010782987-4mjGpChs" }) // ใส่ LIFF ID ตรงนี้
-      .then(() => {
-        if (!liff.isLoggedIn()) {
-          liff.login();
-        } else {
-          liff.getProfile().then(profile => {
-            lineProfile = profile;
-            document.getElementById('displayName').innerText = profile.displayName;
-            document.getElementById('pictureUrl').src = profile.pictureUrl;
-            document.getElementById('profileContainer').style.display = 'flex';
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("LIFF Init Error:", err);
-      });
-  };
+    document.getElementById('photoInput').onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
 
-  // พรีวิวรูปภาพ
-  function previewImage(event) {
-    const reader = new FileReader();
-    reader.onload = function() {
-      const output = document.getElementById('preview');
-      output.src = reader.result;
-      output.style.display = 'block';
-      imageBase64 = reader.result;
+      const reader = new FileReader();
+      reader.onload = function() {
+        const imageBase64 = reader.result;
+        document.getElementById('preview').src = imageBase64;
+        document.getElementById('preview').style.display = 'block';
+        getLocationAndSubmit(imageBase64);
+      };
+      reader.readAsDataURL(file);
     };
-    reader.readAsDataURL(event.target.files[0]);
-  }
 
-  // ส่งข้อมูลลงเวลา
-  function submitData() {
-    if (!lineProfile) { alert('ไม่สามารถดึงข้อมูลโปรไฟล์ LINE ได้'); return; }
-    if (!imageBase64) { alert('กรุณาถ่ายรูปยืนยันตัวตน'); return; }
+    function getLocationAndSubmit(imageBase64) {
+      document.getElementById('status').innerText = 'กำลังดึงตำแหน่ง GPS...';
 
-    const statusDiv = document.getElementById('status');
-    statusDiv.innerText = "กำลังค้นหาพิกัด GPS...";
-    document.getElementById('btnSubmit').disabled = true;
-
-    // ดึงพิกัด GPS
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(position) {
-        statusDiv.innerText = "กำลังบันทึกข้อมูล...";
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const profile = await liff.getProfile();
 
         const payload = {
-          userId: lineProfile.userId,
-          displayName: lineProfile.displayName,
-          type: document.getElementById('type').value,
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          name: profile.displayName,
+          type: pendingType,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
           image: imageBase64
         };
 
-        // ส่งไปประมวลผลที่ Apps Script
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if(res.success) {
-              alert(res.message);
-              liff.closeWindow(); // ปิดหน้าต่าง LIFF
-            } else {
-              alert("เกิดข้อผิดพลาด: " + res.message);
-              document.getElementById('btnSubmit').disabled = false;
-            }
-          })
-          .saveCheckIn(payload);
+        document.getElementById('status').innerText = 'กำลังบันทึก...';
 
-      }, function(error) {
-        alert("กรุณาเปิดการเข้าถึงตำแหน่ง GPS (Location Service)");
-        document.getElementById('btnSubmit').disabled = false;
-        statusDiv.innerText = "";
-      }, { enableHighAccuracy: true });
-    } else {
-      alert("อุปกรณ์ไม่รองรับการระบุพิกัด GPS");
-      document.getElementById('btnSubmit').disabled = false;
+        try {
+          const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+
+          document.getElementById('status').innerText =
+            result.success ? '✅ ' + result.message : '❌ ' + result.message;
+        } catch (err) {
+          document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err;
+        }
+      }, () => {
+        document.getElementById('status').innerText = 'ไม่สามารถดึงตำแหน่งได้ กรุณาเปิด GPS';
+      }, { enableHighAccuracy: true, timeout: 10000 });
     }
-  }
-</script>
-
+  </script>
 </body>
 </html>
