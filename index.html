@@ -31,12 +31,20 @@
 
     let pendingType = null;
 
+    // เช็คก่อนว่า LIFF SDK โหลดสำเร็จไหม
+if (typeof liff === 'undefined') {
+  document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
+} else {
+  try {
     liff.init({ liffId: LIFF_ID }).then(() => {
       document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
     }).catch(err => {
-      document.getElementById('status').innerText = 'เกิดข้อผิดพลาด: ' + err;
+      document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
     });
-
+  } catch (err) {
+    document.getElementById('status').innerText = '❌ Error ทันที: ' + err.message;
+  }
+}
     document.getElementById('checkin').onclick = () => startCheckIn('เข้างาน');
     document.getElementById('checkout').onclick = () => startCheckIn('เลิกงาน');
 
