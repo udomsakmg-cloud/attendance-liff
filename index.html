@@ -62,8 +62,17 @@
     function getLocationAndSubmit(imageBase64) {
       document.getElementById('status').innerText = 'กำลังดึงตำแหน่ง GPS...';
 
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const profile = await liff.getProfile();
+      if (!navigator.geolocation) {
+  document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
+  return;
+}
+
+navigator.geolocation.getCurrentPosition(async (pos) => {
+  // ...
+}, (err) => {
+  document.getElementById('status').innerText =
+    `❌ ดึงตำแหน่งไม่สำเร็จ (code: ${err.code})\n${err.message}\nกรุณาเปิด Location Services และอนุญาตสิทธิ์ให้ LINE ใน Settings`;
+}, { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 });
 
         const payload = {
           name: profile.displayName,
