@@ -35,19 +35,35 @@
   <div id="status">กำลังเตรียมระบบ...</div>
 
   <script>
+    document.getElementById('status').innerText = '0) สคริปต์เริ่มทำงานแล้ว...';
+
     const LIFF_ID = '2010782987-4mjGpChs';
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymGoqNPHEhRuIFRy-pxI3ep3RZatRQ_jCeNjrkYRVc3reBiMtkzbBbfSQTGt8eJuoq1g/exec';
 
     let pendingType = null;
     let liffReady = false;
 
+    document.getElementById('status').innerText = '0.5) เช็ค LIFF SDK... typeof liff = ' + typeof liff;
+
     if (typeof liff === 'undefined') {
       document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
     } else {
+      document.getElementById('status').innerText = '0.7) กำลังเรียก liff.init()...';
+
+      let initFinished = false;
+      setTimeout(() => {
+        if (!initFinished) {
+          document.getElementById('status').innerText =
+            '❌ liff.init() ค้างเกิน 10 วิ ไม่ resolve/reject เลย\n(อาจเป็นปัญหาเน็ตเวิร์คหรือ LIFF ID ผิด)';
+        }
+      }, 10000);
+
       liff.init({ liffId: LIFF_ID }).then(() => {
+        initFinished = true;
         liffReady = true;
         document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
       }).catch(err => {
+        initFinished = true;
         document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
       });
     }
@@ -118,17 +134,47 @@
 
       let name = null;
 
-      // ลองดึงชื่อจาก LIFF profile ก่อน
       try {
         if (liffReady && liff.isLoggedIn && liff.isLoggedIn()) {
           const profile = await liff.getProfile();
           name = profile.displayName;
         }
       } catch (err) {
-        name = null; // ดึงไม่ได้ ให้ไปถามเองด้านล่าง
+        name = null;
       }
 
-      // ถ้าดึงชื่อจากโปรไฟล์ไม่ได้ (เช่น เปิดผ่าน Safari ภายนอก) ให้พิมพ์เอง
       if (!name) {
         name = prompt('ไม่สามารถดึงชื่อจาก LINE ได้ กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name) {
+          document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
+          return;
+        }
+      }
+
+      document.getElementById('status').innerText = '3) กำลังส่งข้อมูล...';
+
+      try {
+        const payload = {
+          name: name,
+          type: pendingType,
+          lat: lat,
+          lng: lng,
+          image: imageBase64
+        };
+
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        document.getElementById('status').innerText =
+          result.success ? '✅ ' + result.message : '❌ ' + result.message;
+
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
