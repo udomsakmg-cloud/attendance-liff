@@ -96,8 +96,17 @@ if (typeof liff === 'undefined') {
           document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err;
         }
       }, () => {
-        document.getElementById('status').innerText = 'ไม่สามารถดึงตำแหน่งได้ กรุณาเปิด GPS';
-      }, { enableHighAccuracy: true, timeout: 10000 });
+      if (!navigator.geolocation) {
+  document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
+  return;
+}
+
+navigator.geolocation.getCurrentPosition(async (pos) => {
+  // ...
+}, (err) => {
+  document.getElementById('status').innerText =
+    `❌ ดึงตำแหน่งไม่สำเร็จ (code: ${err.code})\n${err.message}\nกรุณาเปิด Location Services และอนุญาตสิทธิ์ให้ LINE ใน Settings`;
+}, { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 });
     }
   </script>
 </body>
