@@ -12,6 +12,7 @@
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
+    #openExternal { background: #888; font-size: 14px; padding: 12px; }
     #photoInput {
       position: absolute;
       width: 1px;
@@ -30,6 +31,7 @@
   <img id="preview">
   <button id="checkin">✅ เข้างาน</button>
   <button id="checkout">🔴 เลิกงาน</button>
+  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้า GPS ไม่ทำงาน)</button>
   <div id="status">กำลังเตรียมระบบ...</div>
 
   <script>
@@ -37,28 +39,33 @@
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymGoqNPHEhRuIFRy-pxI3ep3RZatRQ_jCeNjrkYRVc3reBiMtkzbBbfSQTGt8eJuoq1g/exec';
 
     let pendingType = null;
+    let liffReady = false;
 
-    // เช็คก่อนว่า LIFF SDK โหลดสำเร็จไหม
     if (typeof liff === 'undefined') {
       document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
     } else {
-      try {
-        liff.init({ liffId: LIFF_ID }).then(() => {
-          document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
-        }).catch(err => {
-          document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
-        });
-      } catch (err) {
-        document.getElementById('status').innerText = '❌ Error ทันที: ' + err.message;
-      }
+      liff.init({ liffId: LIFF_ID }).then(() => {
+        liffReady = true;
+        document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
+      }).catch(err => {
+        document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
+      });
     }
 
     document.getElementById('checkin').onclick = () => startCheckIn('เข้างาน');
     document.getElementById('checkout').onclick = () => startCheckIn('เลิกงาน');
 
+    document.getElementById('openExternal').onclick = () => {
+      if (liffReady && liff.isInClient()) {
+        liff.openWindow({ url: window.location.href, external: true });
+      } else {
+        document.getElementById('status').innerText = 'หน้านี้เปิดอยู่นอก LINE แล้ว หรือยังไม่พร้อม กรุณากดปุ่มเข้างาน/เลิกงานได้เลย';
+      }
+    };
+
     function startCheckIn(type) {
       pendingType = type;
-      document.getElementById('photoInput').click(); // เปิดกล้องถ่ายรูปก่อน
+      document.getElementById('photoInput').click();
     }
 
     document.getElementById('photoInput').onchange = function(e) {
@@ -75,72 +82,53 @@
       reader.readAsDataURL(file);
     };
 
-function getLocationAndSubmit(imageBase64) {
-  document.getElementById('status').innerText = '1) เรียก GPS...';
+    function getLocationAndSubmit(imageBase64) {
+      document.getElementById('status').innerText = '1) เรียก GPS...';
 
-  if (!navigator.geolocation) {
-    document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
-    return;
-  }
+      if (!navigator.geolocation) {
+        document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
+        return;
+      }
 
-  let finished = false;
-  const fallbackTimer = setTimeout(() => {
-    if (!finished) {
-      finished = true;
-      document.getElementById('status').innerText =
-        '❌ ไม่สามารถดึง GPS ผ่าน LINE ได้\n\nกรุณากดปุ่ม "เปิดใน Safari" ที่มุมขวาบน (⋯) แล้วลองใหม่อีกครั้ง';
-    }
-  }, 8000);
+      let finished = false;
+      const fallbackTimer = setTimeout(() => {
+        if (!finished) {
+          finished = true;
+          document.getElementById('status').innerText =
+            '❌ ไม่สามารถดึง GPS ผ่าน LINE ได้\n\nกรุณากดปุ่ม "🌐 เปิดด้วยเบราว์เซอร์ภายนอก" ด้านบน แล้วลองใหม่';
+        }
+      }, 8000);
 
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    if (finished) return;
-    finished = true;
-    clearTimeout(fallbackTimer);
-    await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64);
-  }, (err) => {
-    if (finished) return;
-    finished = true;
-    clearTimeout(fallbackTimer);
-    document.getElementById('status').innerText =
-      `❌ GPS error (code: ${err.code}): ${err.message}\n\nกรุณากดปุ่ม "เปิดใน Safari" ที่มุมขวาบน (⋯) แล้วลองใหม่`;
-  }, { enableHighAccuracy: false, timeout: 7000, maximumAge: 0 });
-}
-
-async function submitData(lat, lng, imageBase64) {
-  document.getElementById('status').innerText = '2) ได้ตำแหน่งแล้ว กำลังดึงโปรไฟล์...';
-  try {
-    const profile = await liff.getProfile();
-    document.getElementById('status').innerText = '3) กำลังส่งข้อมูล...';
-
-    const payload = {
-      name: profile.displayName,
-      type: pendingType,
-      lat: lat,
-      lng: lng,
-      image: imageBase64
-    };
-
-    const res = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-
-    document.getElementById('status').innerText =
-      result.success ? '✅ ' + result.message : '❌ ' + result.message;
-
-  } catch (err) {
-    document.getElementById('status').innerText = '❌ Error: ' + err.message;
-  }
-}
-
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(fallbackTimer);
+        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64);
       }, (err) => {
+        if (finished) return;
         finished = true;
         clearTimeout(fallbackTimer);
         document.getElementById('status').innerText =
-          `❌ GPS error (code: ${err.code}): ${err.message}`;
-      }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 });
+          `❌ GPS error (code: ${err.code}): ${err.message}\n\nกรุณากดปุ่ม "🌐 เปิดด้วยเบราว์เซอร์ภายนอก" ด้านบน แล้วลองใหม่`;
+      }, { enableHighAccuracy: false, timeout: 7000, maximumAge: 0 });
     }
-  </script>
-</body>
-</html>
+
+    async function submitData(lat, lng, imageBase64) {
+      document.getElementById('status').innerText = '2) ได้ตำแหน่งแล้ว กำลังดึงโปรไฟล์...';
+
+      let name = null;
+
+      // ลองดึงชื่อจาก LIFF profile ก่อน
+      try {
+        if (liffReady && liff.isLoggedIn && liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          name = profile.displayName;
+        }
+      } catch (err) {
+        name = null; // ดึงไม่ได้ ให้ไปถามเองด้านล่าง
+      }
+
+      // ถ้าดึงชื่อจากโปรไฟล์ไม่ได้ (เช่น เปิดผ่าน Safari ภายนอก) ให้พิมพ์เอง
+      if (!name) {
+        name = prompt('ไม่สามารถดึงชื่อจาก LINE ได้ กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
+        if (!name) {
