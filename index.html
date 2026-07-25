@@ -62,60 +62,8 @@
     function getLocationAndSubmit(imageBase64) {
       document.getElementById('status').innerText = 'กำลังดึงตำแหน่ง GPS...';
 
-      if (!navigator.geolocation) {
-  document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
-  return;
-}
-
-function getLocationAndSubmit(imageBase64) {
-  document.getElementById('status').innerText = '1) เรียก GPS...';
-
-  // ตั้ง timeout สำรอง เผื่อ getCurrentPosition ค้างแบบไม่ error ไม่ success เลย
-  let finished = false;
-  const fallbackTimer = setTimeout(() => {
-    if (!finished) {
-      document.getElementById('status').innerText =
-        '❌ GPS ค้างเกิน 8 วิ ไม่มีทั้ง success/error callback (อาจเป็นปัญหา permission ของ webview)';
-    }
-  }, 8000);
-
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    finished = true;
-    clearTimeout(fallbackTimer);
-    document.getElementById('status').innerText = '2) ได้ตำแหน่งแล้ว กำลังดึงโปรไฟล์...';
-
-    try {
-      const profile = await liff.getProfile();
-      document.getElementById('status').innerText = '3) ได้โปรไฟล์แล้ว กำลังส่งข้อมูล...';
-
-      const payload = {
-        name: profile.displayName,
-        type: pendingType,
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        image: imageBase64
-      };
-
-      const res = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-
-      document.getElementById('status').innerText =
-        result.success ? '✅ ' + result.message : '❌ ' + result.message;
-
-    } catch (err) {
-      document.getElementById('status').innerText = '❌ Error หลังได้ตำแหน่ง: ' + err.message;
-    }
-
-  }, (err) => {
-    finished = true;
-    clearTimeout(fallbackTimer);
-    document.getElementById('status').innerText =
-      `❌ GPS error (code: ${err.code}): ${err.message}`;
-  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 });
-}
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const profile = await liff.getProfile();
 
         const payload = {
           name: profile.displayName,
