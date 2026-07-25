@@ -12,7 +12,14 @@
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
-    #photoInput { display: none; }
+    #photoInput {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+      z-index: -1;
+    }
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
@@ -32,19 +39,20 @@
     let pendingType = null;
 
     // เช็คก่อนว่า LIFF SDK โหลดสำเร็จไหม
-if (typeof liff === 'undefined') {
-  document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
-} else {
-  try {
-    liff.init({ liffId: LIFF_ID }).then(() => {
-      document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
-    }).catch(err => {
-      document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
-    });
-  } catch (err) {
-    document.getElementById('status').innerText = '❌ Error ทันที: ' + err.message;
-  }
-}
+    if (typeof liff === 'undefined') {
+      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
+    } else {
+      try {
+        liff.init({ liffId: LIFF_ID }).then(() => {
+          document.getElementById('status').innerText = 'พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
+        }).catch(err => {
+          document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
+        });
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ Error ทันที: ' + err.message;
+      }
+    }
+
     document.getElementById('checkin').onclick = () => startCheckIn('เข้างาน');
     document.getElementById('checkout').onclick = () => startCheckIn('เลิกงาน');
 
@@ -68,46 +76,22 @@ if (typeof liff === 'undefined') {
     };
 
     function getLocationAndSubmit(imageBase64) {
-      document.getElementById('status').innerText = 'กำลังดึงตำแหน่ง GPS...';
+      document.getElementById('status').innerText = '1) เรียก GPS...';
+
+      if (!navigator.geolocation) {
+        document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
+        return;
+      }
+
+      // ตั้ง timeout สำรอง เผื่อ getCurrentPosition ค้างแบบไม่ error ไม่ success เลย
+      let finished = false;
+      const fallbackTimer = setTimeout(() => {
+        if (!finished) {
+          document.getElementById('status').innerText =
+            '❌ GPS ค้างเกิน 8 วิ ไม่มีทั้ง success/error callback (อาจเป็นปัญหา permission ของ webview)';
+        }
+      }, 8000);
 
       navigator.geolocation.getCurrentPosition(async (pos) => {
-        const profile = await liff.getProfile();
-
-        const payload = {
-          name: profile.displayName,
-          type: pendingType,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          image: imageBase64
-        };
-
-        document.getElementById('status').innerText = 'กำลังบันทึก...';
-
-        try {
-          const res = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          });
-          const result = await res.json();
-
-          document.getElementById('status').innerText =
-            result.success ? '✅ ' + result.message : '❌ ' + result.message;
-        } catch (err) {
-          document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err;
-        }
-      }, () => {
-      if (!navigator.geolocation) {
-  document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
-  return;
-}
-
-navigator.geolocation.getCurrentPosition(async (pos) => {
-  // ...
-}, (err) => {
-  document.getElementById('status').innerText =
-    `❌ ดึงตำแหน่งไม่สำเร็จ (code: ${err.code})\n${err.message}\nกรุณาเปิด Location Services และอนุญาตสิทธิ์ให้ LINE ใน Settings`;
-}, { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 });
-    }
-  </script>
-</body>
-</html>
+        finished = true;
+        clearTimeout(fallbackTimer
