@@ -120,15 +120,7 @@
         gpsFinished = true;
         clearTimeout(gpsTimeout);
         
-        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64);
-      }, (err) => {
-        if (gpsFinished) return;
-        gpsFinished = true;
-        clearTimeout(gpsTimeout);
-        document.getElementById('status').innerText = `❌ GPS error: ${err.message}`;
-      }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
-    }
-
+       // --- ส่งข้อมูล ---
     async function submitData(lat, lng, imageBase64) {
       document.getElementById('status').innerText = '2) กำลังดึงข้อมูลโปรไฟล์ LINE...';
 
@@ -145,6 +137,7 @@
       if (!name) {
         name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name || name.trim() === "") {
+          resetUI();
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
           return;
         }
@@ -167,13 +160,38 @@
         });
         const result = await res.json();
 
+        resetUI();
         if (result.success) {
-          document.getElementById('status').innerText = '✅ ' + result.message + ' (' + name + ')';
+          document.getElementById('status').innerText = '✅ ' + result.message;
+          
+          // ---------------------------------------------------------
+          // ส่วนที่เพิ่มใหม่: ส่งข้อความเข้าแชทและปิดหน้าต่างอัตโนมัติ
+          // ---------------------------------------------------------
+          if (liffReady && liff.isInClient()) {
+            liff.sendMessages([
+              {
+                type: 'text',
+                text: `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nพนักงาน: ${name}`
+              }
+            ]).then(() => {
+              // ส่งข้อความเสร็จ สั่งปิดหน้าต่าง LIFF ทันที
+              liff.closeWindow();
+            }).catch((err) => {
+              console.error('ไม่สามารถส่งข้อความได้', err);
+              document.getElementById('status').innerText += '\n(แต่ส่งข้อความยืนยันในแชทไม่ได้)';
+            });
+          } else {
+             // ถ้าเปิดผ่านเบราว์เซอร์ปกติ (ไม่ได้เปิดในแอป LINE) ให้แจ้งเตือนเฉยๆ
+             alert(`✅ บันทึก${pendingType}เรียบร้อยแล้ว`);
+          }
+          // ---------------------------------------------------------
+
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
         }
 
       } catch (err) {
+        resetUI();
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
       }
     }
