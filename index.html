@@ -3,56 +3,66 @@
 <head>
   <base target="_top">
   <meta charset="UTF-8">
-  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 20px 15px; }
     button {
       width: 100%; padding: 16px; margin: 8px 0; font-size: 17px;
-      border: none; border-radius: 10px; color: white;
+      border: none; border-radius: 10px; color: white; cursor: pointer;
     }
-    #checkin { background: #06C755; } /* สีเขียว */
-    #checkout { background: #FF5555; } /* สีแดง */
+    #checkin { background: #06C755; }
+    #checkout { background: #FF5555; }
+    #captureBtn { background: #00B900; display: none; font-weight: bold; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
-    /* ซ่อน input file ตัวจริง */
-    #photoInput {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      overflow: hidden;
-      z-index: -1;
+    
+    /* กล่องสำหรับพรีวิวกล้องสด */
+    #cameraContainer {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      margin: 10px auto;
+      display: none;
     }
-    #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
+    #video {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      transform: scaleX(-1); /* กลับด้านกระจกสำหรับกล้องหน้า */
+    }
+    #canvas { display: none; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
+    #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
   </style>
 </head>
 <body>
   <h2>📍 ลงเวลางาน</h2>
+
+  <!-- ส่วนแสดงผลกล้องสด -->
+  <div id="cameraContainer">
+    <video id="video" autoplay playsinline></video>
+    <button id="captureBtn">📸 กดถ่ายรูปยืนยัน</button>
+  </div>
   
-  <!-- ❗❗❗ จุดที่แก้ไข: บังคับใช้กล้องเท่านั้น ❗❗❗ -->
-  <!-- หากต้องการกล้องหน้า: capture="user", หากต้องการกล้องหลัง: capture="environment" -->
-  <input type="file" id="photoInput" accept="image/*" capture="user">
-  
+  <canvas id="canvas"></canvas>
   <img id="preview" alt="รูปตัวอย่าง">
+
   <button id="checkin">✅ เข้างาน</button>
   <button id="checkout">🔴 เลิกงาน</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้า GPS ไม่ทำงาน)</button>
   <div id="status">กำลังเตรียมระบบ...</div>
 
   <script>
-    // แก้ไข LIFF ID ของคุณที่นี่
     const LIFF_ID = '2010782987-4mjGpChs';
-    // แก้ไข URL ของ Google Apps Script (Web App URL) ที่นี่
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZp93MR15Yc-haCY1BBVOmAW3KyYlN3mZq7_Bhu7qfiJtENrgJWF7dX9HUKyYOubSmGA/exec';
     
     let pendingType = null;
     let liffReady = false;
+    let mediaStream = null;
 
     document.getElementById('status').innerText = '0.5) กำลังโหลด LIFF SDK...';
 
     if (typeof liff === 'undefined') {
-      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต แล้วลองเปิดใหม่';
+      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต';
     } else {
       liff.init({ liffId: LIFF_ID }).then(() => {
         liffReady = true;
@@ -62,11 +72,9 @@
       });
     }
 
-    // Event Listener สำหรับปุ่ม
-    document.getElementById('checkin').onclick = () => startProcess('เข้างาน');
-    document.getElementById('checkout').onclick = () => startProcess('เลิกงาน');
+    document.getElementById('checkin').onclick = () => startCameraSession('เข้างาน');
+    document.getElementById('checkout').onclick = () => startCameraSession('เลิกงาน');
 
-    // ฟังก์ชันเปิดเบราว์เซอร์ภายนอก
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
         liff.openWindow({ url: window.location.href, external: true });
@@ -75,41 +83,64 @@
       }
     };
 
-    // --- ขั้นตอนที่ 1: กดปุ่ม แล้วเรียกกล้อง ---
-    function startProcess(type) {
+    // --- ขั้นตอนที่ 1: เปิดกล้องหน้าตรงๆ โดยไม่ผ่านไฟล์ ---
+    async function startCameraSession(type) {
       pendingType = type;
-      // เคลียร์รูปเก่า
       document.getElementById('preview').style.display = 'none';
-      document.getElementById('preview').src = '';
-      // สั่งคลิก input file
-      document.getElementById('photoInput').click();
+      document.getElementById('status').innerText = 'กำลังเปิดกล้องหน้า...';
+
+      try {
+        // บังคับใช้กล้องหน้า (facingMode: "user")
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
+          audio: false
+        });
+
+        const videoElement = document.getElementById('video');
+        videoElement.srcObject = mediaStream;
+        
+        // แสดงจอพรีวิวกล้องและซ่อนปุ่มเมนูหลักชั่วคราว
+        document.getElementById('cameraContainer').style.display = 'block';
+        document.getElementById('captureBtn').style.display = 'block';
+        document.getElementById('checkin').style.display = 'none';
+        document.getElementById('checkout').style.display = 'none';
+        document.getElementById('openExternal').style.display = 'none';
+        document.getElementById('status').innerText = 'จัดท่าทางให้เรียบร้อย แล้วกดปุ่มถ่ายรูปด้านล่าง';
+
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ ไม่สามารถเปิดกล้องได้: ' + err.message + '\n(กรุณาอนุญาตสิทธิ์การใช้กล้องในเบราว์เซอร์)';
+      }
     }
 
-    // --- ขั้นตอนที่ 2: ถ่ายรูปเสร็จแล้ว อ่านไฟล์ แล้วเรียก GPS ---
-    document.getElementById('photoInput').onchange = function(e) {
-      const file = e.target.files[0];
-      if (!file) {
-        document.getElementById('status').innerText = '⚠️ ยกเลิกการถ่ายรูป';
-        return;
+    // --- ขั้นตอนที่ 2: กดปุ่มถ่ายภาพจากสตรีมวิดีโอ ---
+    document.getElementById('captureBtn').onclick = function() {
+      const videoElement = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      // วาดภาพจากวิดีโอลง Canvas
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+      // ปิดกล้องหลังถ่ายเสร็จ
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
       }
 
-      // เช็กว่าเป็นรูปภาพหรือไม่ (กันเหนียว)
-      if (!file.type.startsWith('image/')) {
-        document.getElementById('status').innerText = '❌ กรุณาเลือกไฟล์รูปภาพเท่านั้น';
-        return;
-      }
+      // ซ่อนหน้าจอกล้อง เปิดภาพตัวอย่าง
+      document.getElementById('cameraContainer').style.display = 'none';
+      document.getElementById('captureBtn').style.display = 'none';
+      
+      const preview = document.getElementById('preview');
+      preview.src = imageBase64;
+      preview.style.display = 'block';
 
-      const reader = new FileReader();
-      reader.onload = function() {
-        const imageBase64 = reader.result;
-        // แสดงรูปพรีวิว
-        document.getElementById('preview').src = imageBase64;
-        document.getElementById('preview').style.display = 'block';
-        
-        // ไปขั้นตอนที่ 3: เอาตำแหน่งและส่งข้อมูล
-        getLocationAndSubmit(imageBase64);
-      };
-      reader.readAsDataURL(file);
+      // ไปขั้นตอนดึง GPS และส่งข้อมูลต่อ
+      getLocationAndSubmit(imageBase64);
     };
 
     // --- ขั้นตอนที่ 3: ดึง GPS ---
@@ -117,61 +148,53 @@
       document.getElementById('status').innerText = '1) กำลังค้นหาตำแหน่ง GPS...';
 
       if (!navigator.geolocation) {
-        document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS กรุณากดปุ่ม "🌐 เปิดด้วยเบราว์เซอร์ภายนอก"';
+        resetUI();
+        document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
         return;
       }
 
-      // ตั้งค่า Timeout เผื่อ GPS นานเกินไป
       let gpsFinished = false;
       const gpsTimeout = setTimeout(() => {
         if (!gpsFinished) {
           gpsFinished = true;
-          document.getElementById('status').innerText = 
-            '❌ ไม่สามารถดึงตำแหน่ง GPS ทันเวลา\n\nกรุณากดปุ่ม "🌐 เปิดด้วยเบราว์เซอร์ภายนอก" ด้านบน แล้วลองใหม่';
+          resetUI();
+          document.getElementById('status').innerText = '❌ ไม่สามารถดึงตำแหน่ง GPS ทันเวลา';
         }
-      }, 10000); // รอ 10 วินาที
+      }, 10000);
 
       navigator.geolocation.getCurrentPosition(async (pos) => {
         if (gpsFinished) return;
         gpsFinished = true;
         clearTimeout(gpsTimeout);
         
-        // ไปขั้นตอนที่ 4: ส่งข้อมูล
         await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64);
       }, (err) => {
         if (gpsFinished) return;
         gpsFinished = true;
         clearTimeout(gpsTimeout);
-        
-        document.getElementById('status').innerText = 
-          `❌ GPS error (code: ${err.code}): ${err.message}\n\nกรุณากดปุ่ม "🌐 เปิดด้วยเบราว์เซอร์ภายนอก" ด้านบน แล้วลองใหม่`;
+        resetUI();
+        document.getElementById('status').innerText = `❌ GPS error: ${err.message}`;
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    // --- ขั้นตอนที่ 4: ดึงชื่อ LINE และส่งข้อมูลไป Google Apps Script ---
+    // --- ขั้นตอนที่ 4: ส่งข้อมูล ---
     async function submitData(lat, lng, imageBase64) {
-      document.getElementById('status').innerText = '2) ได้ตำแหน่งแล้ว กำลังดึงข้อมูลโปรไฟล์ LINE...';
+      document.getElementById('status').innerText = '2) กำลังดึงข้อมูลโปรไฟล์ LINE...';
 
       let name = null;
-
-      // พยายามดึงชื่อจาก LINE
       try {
         if (liffReady && liff.isLoggedIn && liff.isLoggedIn()) {
           const profile = await liff.getProfile();
           name = profile.displayName;
-        } else {
-          // ถ้าไม่ได้ล็อกอิน (เปิดนอก LINE)
-          name = null;
         }
       } catch (err) {
-        console.error('liff.getProfile error:', err);
         name = null;
       }
 
-      // ถ้าดึงชื่อไม่ได้ ให้กรอกเอง
       if (!name) {
-        name = prompt('ไม่สามารถดึงชื่อจาก LINE ได้ กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
+        name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name || name.trim() === "") {
+          resetUI();
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
           return;
         }
@@ -188,16 +211,13 @@
           image: imageBase64
         };
 
-        // ส่งข้อมูลแบบ POST ไปยัง Google Apps Script
         const res = await fetch(SCRIPT_URL, {
           method: 'POST',
-          // mode: 'no-cors', // ถ้าติดปัญหา CORS ให้ลองเปิดบรรทัดนี้ (แต่จะอ่าน response ไม่ได้)
           body: JSON.stringify(payload)
         });
-
-        // อ่านผลลัพธ์
         const result = await res.json();
 
+        resetUI();
         if (result.success) {
           document.getElementById('status').innerText = '✅ ' + result.message + ' (' + name + ')';
         } else {
@@ -205,9 +225,16 @@
         }
 
       } catch (err) {
-        console.error('Fetch error:', err);
+        resetUI();
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
       }
+    }
+
+    // คืนค่าปุ่มกดหน้าแรกเมื่อทำรายการเสร็จ
+    function resetUI() {
+      document.getElementById('checkin').style.display = 'block';
+      document.getElementById('checkout').style.display = 'block';
+      document.getElementById('openExternal').style.display = 'block';
     }
   </script>
 </body>
