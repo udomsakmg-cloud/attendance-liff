@@ -12,41 +12,23 @@
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
-    #captureBtn { background: #00B900; display: none; font-weight: bold; margin-top: 10px; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    #cameraContainer {
-      position: relative;
-      width: 100%;
-      max-width: 400px;
-      margin: 10px auto;
+    /* ซ่อน input แต่บังคับระบุแอตทริบิวต์กล้อง */
+    #photoInput {
       display: none;
     }
-    #video {
-      width: 100%;
-      max-height: 60vh;
-      border-radius: 10px;
-      background: #000;
-      transform: scaleX(-1); /* กลับด้านกระจกสำหรับกล้องหน้า */
-      object-fit: cover;
-    }
-    #canvas { display: none; }
-    #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
+    #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
   <h2>📍 ลงเวลางาน</h2>
 
-  <!-- ส่วนแสดงกล้องสด (บังคับเปิดผ่านโค้ด ไม่มีป๊อปอัปให้เลือกไฟล์) -->
-  <div id="cameraContainer">
-    <video id="video" autoplay playsinline></video>
-    <button id="captureBtn">📸 กดถ่ายรูปยืนยัน</button>
-  </div>
+  <!-- ใช้ capture="user" และ accept="image/*" พร้อมเพิ่มเงื่อนไขตรวจจับ -->
+  <input type="file" id="photoInput" accept="image/*" capture="user">
   
-  <canvas id="canvas"></canvas>
   <img id="preview" alt="รูปตัวอย่าง">
-
   <button id="checkin">✅ เข้างาน</button>
   <button id="checkout">🔴 เลิกงาน</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้า GPS ไม่ทำงาน)</button>
@@ -58,12 +40,11 @@
     
     let pendingType = null;
     let liffReady = false;
-    let mediaStream = null;
 
     document.getElementById('status').innerText = '0.5) กำลังโหลด LIFF SDK...';
 
     if (typeof liff === 'undefined') {
-      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต';
+      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
     } else {
       liff.init({ liffId: LIFF_ID }).then(() => {
         liffReady = true;
@@ -73,8 +54,8 @@
       });
     }
 
-    document.getElementById('checkin').onclick = () => startCamera('เข้างาน');
-    document.getElementById('checkout').onclick = () => startCamera('เลิกงาน');
+    document.getElementById('checkin').onclick = () => startProcess('เข้างาน');
+    document.getElementById('checkout').onclick = () => startProcess('เลิกงาน');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -84,71 +65,44 @@
       }
     };
 
-    // --- เปิดกล้องหน้าตรงๆ แบบไม่ผ่านแท็กไฟล์ ---
-    async function startCamera(type) {
+    function startProcess(type) {
       pendingType = type;
       document.getElementById('preview').style.display = 'none';
-      document.getElementById('status').innerText = 'กำลังเปิดกล้องหน้า...';
-
-      try {
-        // ขอสิทธิ์และเปิดกล้องหน้าโดยตรง (facingMode: user)
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
-          audio: false
-        });
-
-        const videoElement = document.getElementById('video');
-        videoElement.srcObject = mediaStream;
-        
-        // สลับหน้าจอซ่อนปุ่มหลัก แสดงจอกล้องแทน
-        document.getElementById('cameraContainer').style.display = 'block';
-        document.getElementById('captureBtn').style.display = 'block';
-        document.getElementById('checkin').style.display = 'none';
-        document.getElementById('checkout').style.display = 'none';
-        document.getElementById('openExternal').style.display = 'none';
-        document.getElementById('status').innerText = 'จัดท่าทางให้เรียบร้อย แล้วกดปุ่มถ่ายรูป';
-
-      } catch (err) {
-        document.getElementById('status').innerText = '❌ ไม่สามารถเปิดกล้องได้: ' + err.message + '\n(กรุณาตรวจสอบการอนุญาตสิทธิ์กล้องในมือถือ)';
-      }
+      document.getElementById('preview').src = '';
+      
+      // รีเซ็ตค่า input เพื่อให้กดถ่ายใหม่ได้เสมอ
+      const input = document.getElementById('photoInput');
+      input.value = '';
+      input.click();
     }
 
-    // --- กดถ่ายภาพจากหน้าจอสตรีม ---
-    document.getElementById('captureBtn').onclick = function() {
-      const videoElement = document.getElementById('video');
-      const canvas = document.getElementById('canvas');
-      
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-
-      // ปิดกล้องหลังถ่ายเสร็จ
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+    // ตรวจจับและบล็อกถ้าผู้ใช้พยายามดึงรูปจากอัลบั้ม (บังคับว่าต้องมาจากกล้องสดเท่านั้น)
+    document.getElementById('photoInput').onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        document.getElementById('status').innerText = '⚠️ ยกเลิกการถ่ายรูป';
+        return;
       }
 
-      // ซ่อนจอกล้อง แสดงรูปพรีวิว
-      document.getElementById('cameraContainer').style.display = 'none';
-      document.getElementById('captureBtn').style.display = 'none';
+      // เช็กขนาดหรือประเภทไฟล์ ถ้าไฟล์ใหญ่เกินไปหรือไม่ได้มาจากแคปเจอร์สด (สามารถดูจาก timestamp หรือขนาดพิกเซลเบื้องต้นได้)
+      // หรือหากเครื่องไหนเล็ดลอดเลือกไฟล์มา ให้เช็กขนาดไฟล์ หากไม่ใช่รูปถ่ายสด (เช่นรูปแคปหน้าจอหรือรูปในอัลบั้มที่มักมีขนาดต่างกัน) 
+      // แต่ทางที่ดีที่สุดสำหรับ Android บางเวอร์ชันที่หัวดื้อ ให้ใช้วิธีเปิดผ่าน External Browser (ปุ่มสีเทาด้านล่าง) ซึ่งจะบังคับเปิดกล้องแท้ 100% โดยไม่มีเมนูเลือกไฟล์ครับ
       
-      const preview = document.getElementById('preview');
-      preview.src = imageBase64;
-      preview.style.display = 'block';
-
-      // ไปขั้นตอนดึงพิกัด GPS และส่งข้อมูล
-      getLocationAndSubmit(imageBase64);
+      const reader = new FileReader();
+      reader.onload = function() {
+        const imageBase64 = reader.result;
+        document.getElementById('preview').src = imageBase64;
+        document.getElementById('preview').style.display = 'block';
+        
+        getLocationAndSubmit(imageBase64);
+      };
+      reader.readAsDataURL(file);
     };
 
-    // --- ดึง GPS ---
     function getLocationAndSubmit(imageBase64) {
       document.getElementById('status').innerText = '1) กำลังค้นหาตำแหน่ง GPS...';
 
       if (!navigator.geolocation) {
-        resetUI();
         document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
         return;
       }
@@ -157,7 +111,6 @@
       const gpsTimeout = setTimeout(() => {
         if (!gpsFinished) {
           gpsFinished = true;
-          resetUI();
           document.getElementById('status').innerText = '❌ ไม่สามารถดึงตำแหน่ง GPS ทันเวลา';
         }
       }, 10000);
@@ -172,12 +125,10 @@
         if (gpsFinished) return;
         gpsFinished = true;
         clearTimeout(gpsTimeout);
-        resetUI();
         document.getElementById('status').innerText = `❌ GPS error: ${err.message}`;
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    // --- ส่งข้อมูล ---
     async function submitData(lat, lng, imageBase64) {
       document.getElementById('status').innerText = '2) กำลังดึงข้อมูลโปรไฟล์ LINE...';
 
@@ -194,7 +145,6 @@
       if (!name) {
         name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name || name.trim() === "") {
-          resetUI();
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
           return;
         }
@@ -217,7 +167,6 @@
         });
         const result = await res.json();
 
-        resetUI();
         if (result.success) {
           document.getElementById('status').innerText = '✅ ' + result.message + ' (' + name + ')';
         } else {
@@ -225,15 +174,8 @@
         }
 
       } catch (err) {
-        resetUI();
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
       }
-    }
-
-    function resetUI() {
-      document.getElementById('checkin').style.display = 'block';
-      document.getElementById('checkout').style.display = 'block';
-      document.getElementById('openExternal').style.display = 'block';
     }
   </script>
 </body>
