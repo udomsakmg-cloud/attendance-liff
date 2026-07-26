@@ -14,46 +14,64 @@
     #checkout { background: #FF5555; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    /* ซ่อน input แต่บังคับระบุแอตทริบิวต์กล้อง */
-    #photoInput {
-      display: none;
-    }
-    #status { margin-top: 15px; font-size: 14px; white-space: pre-line; }
+    #photoInput { display: none; }
+    #status { margin-top: 15px; font-size: 14px; white-space: pre-line; color: #333; font-weight: bold; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
   <h2>📍 ลงเวลางาน</h2>
 
-  <!-- ใช้ capture="user" และ accept="image/*" เพื่อบังคับเปิดกล้อง -->
   <input type="file" id="photoInput" accept="image/*" capture="user">
-  
   <img id="preview" alt="รูปตัวอย่าง">
+  
   <button id="checkin">✅ เข้างาน</button>
   <button id="checkout">🔴 เลิกงาน</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้า GPS ไม่ทำงาน)</button>
-  <div id="status">กำลังเตรียมระบบ...</div>
+  
+  <!-- กล่องแสดงสถานะ -->
+  <div id="status">0) กำลังเตรียมระบบ...</div>
 
   <script>
+    // ดักจับ Error ในหน้าเว็บทั้งหมด (เพื่อดูว่ามีโค้ดส่วนไหนพัง)
+    window.onerror = function(msg, url, line) {
+      document.getElementById('status').innerText = '❌ Error บรรทัด ' + line + ': ' + msg;
+    };
+
     const LIFF_ID = '2010782987-4mjGpChs';
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZp93MR15Yc-haCY1BBVOmAW3KyYlN3mZq7_Bhu7qfiJtENrgJWF7dX9HUKyYOubSmGA/exec';
     
     let pendingType = null;
     let liffReady = false;
 
-    document.getElementById('status').innerText = '0.5) กำลังโหลด LIFF SDK...';
+    document.getElementById('status').innerText = '1) กำลังโหลด LIFF SDK...';
 
+    // เช็คว่าโหลดสคริปต์ LINE มาได้ไหม
     if (typeof liff === 'undefined') {
-      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
+      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ (เช็คอินเทอร์เน็ต)';
     } else {
+      document.getElementById('status').innerText = '2) กำลังเชื่อมต่อระบบ LINE...';
+      
+      // ตั้งเวลาจับผิด หากเชื่อมต่อ LINE นานเกิน 7 วินาที
+      let isLiffInit = false;
+      setTimeout(() => {
+        if (!isLiffInit) {
+          document.getElementById('status').innerText = '❌ เชื่อมต่อ LINE นานผิดปกติ (LIFF ID อาจผิด หรือแอป LINE มีปัญหา)';
+        }
+      }, 7000);
+
+      // เริ่มเชื่อมต่อ
       liff.init({ liffId: LIFF_ID }).then(() => {
+        isLiffInit = true;
         liffReady = true;
         document.getElementById('status').innerText = '✅ พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
       }).catch(err => {
-        document.getElementById('status').innerText = '❌ liff.init error: ' + JSON.stringify(err);
+        isLiffInit = true;
+        document.getElementById('status').innerText = '❌ liff.init error: ' + err.message;
       });
     }
 
+    // --- ส่วนปุ่มกดต่างๆ ---
     document.getElementById('checkin').onclick = () => startProcess('เข้างาน');
     document.getElementById('checkout').onclick = () => startProcess('เลิกงาน');
 
@@ -61,16 +79,19 @@
       if (liffReady && liff.isInClient()) {
         liff.openWindow({ url: window.location.href, external: true });
       } else {
-        document.getElementById('status').innerText = 'หน้านี้เปิดอยู่นอก LINE แล้ว หรือยังไม่พร้อม';
+        document.getElementById('status').innerText = 'หน้านี้เปิดอยู่นอก LINE แล้ว';
       }
     };
 
     function startProcess(type) {
+      if (!liffReady) {
+        alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
+        return;
+      }
       pendingType = type;
       document.getElementById('preview').style.display = 'none';
       document.getElementById('preview').src = '';
       
-      // รีเซ็ตค่า input เพื่อให้กดถ่ายใหม่ได้เสมอ
       const input = document.getElementById('photoInput');
       input.value = '';
       input.click();
@@ -88,14 +109,13 @@
         const imageBase64 = reader.result;
         document.getElementById('preview').src = imageBase64;
         document.getElementById('preview').style.display = 'block';
-        
         getLocationAndSubmit(imageBase64);
       };
       reader.readAsDataURL(file);
     };
 
     function getLocationAndSubmit(imageBase64) {
-      document.getElementById('status').innerText = '1) กำลังค้นหาตำแหน่ง GPS...';
+      document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
 
       if (!navigator.geolocation) {
         document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
@@ -106,7 +126,7 @@
       const gpsTimeout = setTimeout(() => {
         if (!gpsFinished) {
           gpsFinished = true;
-          document.getElementById('status').innerText = '❌ ไม่สามารถดึงตำแหน่ง GPS ทันเวลา';
+          document.getElementById('status').innerText = '❌ ค้นหาพิกัด GPS นานเกินไป กรุณากดปุ่มเปิดภายนอก';
         }
       }, 10000);
 
@@ -125,7 +145,7 @@
     }
 
     async function submitData(lat, lng, imageBase64) {
-      document.getElementById('status').innerText = '2) กำลังดึงข้อมูลโปรไฟล์ LINE...';
+      document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
 
       let name = null;
       try {
@@ -145,7 +165,7 @@
         }
       }
 
-      document.getElementById('status').innerText = '3) กำลังส่งข้อมูลไปยังระบบ...';
+      document.getElementById('status').innerText = '⏳ กำลังส่งข้อมูลเข้าระบบ...';
 
       try {
         const payload = {
@@ -165,7 +185,6 @@
         if (result.success) {
           document.getElementById('status').innerText = '✅ ' + result.message;
           
-          // ส่งข้อความเข้าแชทและปิดหน้าต่างอัตโนมัติ
           if (liffReady && liff.isInClient()) {
             liff.sendMessages([
               {
@@ -175,13 +194,11 @@
             ]).then(() => {
               liff.closeWindow();
             }).catch((err) => {
-              console.error('ไม่สามารถส่งข้อความได้', err);
-              document.getElementById('status').innerText += '\n(แต่ส่งข้อความยืนยันในแชทไม่ได้)';
+              document.getElementById('status').innerText += '\n(เซฟสำเร็จ แต่ส่งแชทไม่ได้)';
             });
           } else {
              alert(`✅ บันทึก${pendingType}เรียบร้อยแล้ว`);
           }
-
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
         }
