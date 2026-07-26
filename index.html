@@ -12,10 +12,9 @@
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
-    #captureBtn { background: #00B900; display: none; font-weight: bold; }
+    #captureBtn { background: #00B900; display: none; font-weight: bold; margin-top: 10px; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    /* กล่องสำหรับพรีวิวกล้องสด */
     #cameraContainer {
       position: relative;
       width: 100%;
@@ -25,9 +24,11 @@
     }
     #video {
       width: 100%;
+      max-height: 60vh;
       border-radius: 10px;
       background: #000;
       transform: scaleX(-1); /* กลับด้านกระจกสำหรับกล้องหน้า */
+      object-fit: cover;
     }
     #canvas { display: none; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
@@ -37,7 +38,7 @@
 <body>
   <h2>📍 ลงเวลางาน</h2>
 
-  <!-- ส่วนแสดงผลกล้องสด -->
+  <!-- ส่วนแสดงกล้องสด (บังคับเปิดผ่านโค้ด ไม่มีป๊อปอัปให้เลือกไฟล์) -->
   <div id="cameraContainer">
     <video id="video" autoplay playsinline></video>
     <button id="captureBtn">📸 กดถ่ายรูปยืนยัน</button>
@@ -72,8 +73,8 @@
       });
     }
 
-    document.getElementById('checkin').onclick = () => startCameraSession('เข้างาน');
-    document.getElementById('checkout').onclick = () => startCameraSession('เลิกงาน');
+    document.getElementById('checkin').onclick = () => startCamera('เข้างาน');
+    document.getElementById('checkout').onclick = () => startCamera('เลิกงาน');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -83,14 +84,14 @@
       }
     };
 
-    // --- ขั้นตอนที่ 1: เปิดกล้องหน้าตรงๆ โดยไม่ผ่านไฟล์ ---
-    async function startCameraSession(type) {
+    // --- เปิดกล้องหน้าตรงๆ แบบไม่ผ่านแท็กไฟล์ ---
+    async function startCamera(type) {
       pendingType = type;
       document.getElementById('preview').style.display = 'none';
       document.getElementById('status').innerText = 'กำลังเปิดกล้องหน้า...';
 
       try {
-        // บังคับใช้กล้องหน้า (facingMode: "user")
+        // ขอสิทธิ์และเปิดกล้องหน้าโดยตรง (facingMode: user)
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } },
           audio: false
@@ -99,20 +100,20 @@
         const videoElement = document.getElementById('video');
         videoElement.srcObject = mediaStream;
         
-        // แสดงจอพรีวิวกล้องและซ่อนปุ่มเมนูหลักชั่วคราว
+        // สลับหน้าจอซ่อนปุ่มหลัก แสดงจอกล้องแทน
         document.getElementById('cameraContainer').style.display = 'block';
         document.getElementById('captureBtn').style.display = 'block';
         document.getElementById('checkin').style.display = 'none';
         document.getElementById('checkout').style.display = 'none';
         document.getElementById('openExternal').style.display = 'none';
-        document.getElementById('status').innerText = 'จัดท่าทางให้เรียบร้อย แล้วกดปุ่มถ่ายรูปด้านล่าง';
+        document.getElementById('status').innerText = 'จัดท่าทางให้เรียบร้อย แล้วกดปุ่มถ่ายรูป';
 
       } catch (err) {
-        document.getElementById('status').innerText = '❌ ไม่สามารถเปิดกล้องได้: ' + err.message + '\n(กรุณาอนุญาตสิทธิ์การใช้กล้องในเบราว์เซอร์)';
+        document.getElementById('status').innerText = '❌ ไม่สามารถเปิดกล้องได้: ' + err.message + '\n(กรุณาตรวจสอบการอนุญาตสิทธิ์กล้องในมือถือ)';
       }
     }
 
-    // --- ขั้นตอนที่ 2: กดปุ่มถ่ายภาพจากสตรีมวิดีโอ ---
+    // --- กดถ่ายภาพจากหน้าจอสตรีม ---
     document.getElementById('captureBtn').onclick = function() {
       const videoElement = document.getElementById('video');
       const canvas = document.getElementById('canvas');
@@ -121,7 +122,6 @@
       canvas.height = videoElement.videoHeight;
       
       const ctx = canvas.getContext('2d');
-      // วาดภาพจากวิดีโอลง Canvas
       ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
       
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
@@ -131,7 +131,7 @@
         mediaStream.getTracks().forEach(track => track.stop());
       }
 
-      // ซ่อนหน้าจอกล้อง เปิดภาพตัวอย่าง
+      // ซ่อนจอกล้อง แสดงรูปพรีวิว
       document.getElementById('cameraContainer').style.display = 'none';
       document.getElementById('captureBtn').style.display = 'none';
       
@@ -139,11 +139,11 @@
       preview.src = imageBase64;
       preview.style.display = 'block';
 
-      // ไปขั้นตอนดึง GPS และส่งข้อมูลต่อ
+      // ไปขั้นตอนดึงพิกัด GPS และส่งข้อมูล
       getLocationAndSubmit(imageBase64);
     };
 
-    // --- ขั้นตอนที่ 3: ดึง GPS ---
+    // --- ดึง GPS ---
     function getLocationAndSubmit(imageBase64) {
       document.getElementById('status').innerText = '1) กำลังค้นหาตำแหน่ง GPS...';
 
@@ -177,7 +177,7 @@
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    // --- ขั้นตอนที่ 4: ส่งข้อมูล ---
+    // --- ส่งข้อมูล ---
     async function submitData(lat, lng, imageBase64) {
       document.getElementById('status').innerText = '2) กำลังดึงข้อมูลโปรไฟล์ LINE...';
 
@@ -230,7 +230,6 @@
       }
     }
 
-    // คืนค่าปุ่มกดหน้าแรกเมื่อทำรายการเสร็จ
     function resetUI() {
       document.getElementById('checkin').style.display = 'block';
       document.getElementById('checkout').style.display = 'block';
