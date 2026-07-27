@@ -32,6 +32,39 @@
     #checkout { background: #FF5555; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
+    /* กล่องกรอกเหตุผลตอนมาสาย */
+    #reason-container {
+      display: none;
+      max-width: 400px;
+      margin: 15px auto;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      text-align: left;
+    }
+    #reason-container label {
+      font-weight: bold;
+      color: #d9534f;
+      display: block;
+      margin-bottom: 8px;
+    }
+    #lateReason {
+      width: 100%;
+      height: 80px;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 15px;
+      resize: none;
+    }
+    #submitReasonBtn {
+      background: #f0ad4e;
+      color: white;
+      margin-top: 10px;
+    }
+
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; color: #333; font-weight: bold; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
@@ -47,6 +80,14 @@
   <canvas id="canvas" style="display: none;"></canvas>
   <img id="preview" alt="รูปที่ถ่าย">
   
+  <!-- กล่องกรอกเหตุผลกรณีมาสาย (ซ่อนไว้ก่อน) -->
+  <div id="reason-container">
+    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 09:00 น.)</label>
+    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุเหตุผลความจำเป็นที่มาสาย:</p>
+    <textarea id="lateReason" placeholder="เช่น รถติด, ฝนตกหนัก, ติดภารกิจด่วน..."></textarea>
+    <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
+  </div>
+
   <button id="checkin">✅ เข้างาน (ถ่ายรูป)</button>
   <button id="checkout">🔴 เลิกงาน (ถ่ายรูป)</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้ากล้อง/GPS ไม่ทำงาน)</button>
@@ -63,6 +104,7 @@
     
     let pendingType = null;
     let liffReady = false;
+    let cachedImageBase64 = null;
     const video = document.getElementById('videoStream');
     const canvas = document.getElementById('canvas');
 
@@ -123,16 +165,44 @@
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      cachedImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
       
       document.getElementById('camera-container').style.display = 'none';
-      document.getElementById('preview').src = imageBase64;
+      document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      getLocationAndSubmit(imageBase64);
+      // ตรวจสอบว่าเป็น "เข้างาน" และเลยเวลา 09:00 น. หรือไม่
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const currentTime = `${hours}:${minutes}`;
+
+      if (type === 'เข้างาน' && currentTime > "09:00") {
+        // หากมาสาย ให้แสดงกล่องกรอกเหตุผล และซ่อนปุ่มกดหลัก
+        document.getElementById('reason-container').style.display = 'block';
+        document.getElementById('checkin').style.display = 'none';
+        document.getElementById('checkout').style.display = 'none';
+        document.getElementById('openExternal').style.display = 'none';
+        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 09:00 น. กรุณากรอกเหตุผลด้านบน';
+      } else {
+        // ปกติ หรือ เลิกงาน ให้ส่งข้อมูลทันที
+        getLocationAndSubmit(cachedImageBase64, "-");
+      }
     }
 
-    function getLocationAndSubmit(imageBase64) {
+    // ปุ่มกดส่งเหตุผลกรณีมาสาย
+    document.getElementById('submitReasonBtn').onclick = () => {
+      const reasonText = document.getElementById('lateReason').value.trim();
+      if (!reasonText) {
+        alert("กรุณากรอกเหตุผลการมาสายก่อนดำเนินการต่อ");
+        return;
+      }
+      // ซ่อนกล่องกรอกเหตุผล แล้วเริ่มดึง GPS ส่งข้อมูล
+      document.getElementById('reason-container').style.display = 'none';
+      getLocationAndSubmit(cachedImageBase64, reasonText);
+    };
+
+    function getLocationAndSubmit(imageBase64, reason) {
       document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
 
       if (!navigator.geolocation) {
@@ -153,7 +223,7 @@
         gpsFinished = true;
         clearTimeout(gpsTimeout);
         
-        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64);
+        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason);
       }, (err) => {
         if (gpsFinished) return;
         gpsFinished = true;
@@ -162,7 +232,7 @@
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    async function submitData(lat, lng, imageBase64) {
+    async function submitData(lat, lng, imageBase64, reason) {
       document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
 
       let name = null;
@@ -181,6 +251,9 @@
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
+          document.getElementById('checkin').style.display = 'block';
+          document.getElementById('checkout').style.display = 'block';
+          document.getElementById('openExternal').style.display = 'block';
           return;
         }
       }
@@ -193,7 +266,8 @@
           type: pendingType,
           lat: lat,
           lng: lng,
-          image: imageBase64
+          image: imageBase64,
+          reason: reason
         };
 
         const res = await fetch(SCRIPT_URL, {
@@ -205,12 +279,17 @@
         if (result.success) {
           document.getElementById('status').innerText = '✅ ' + result.message;
           
-          // ส่งข้อความเข้าแชท LINE พร้อมแนบสถานะ (ปกติ/สาย)
+          let lineMsg = `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`;
+          if (reason && reason !== '-') {
+            lineMsg += `\n💬 เหตุผล: ${reason}`;
+          }
+
+          // ส่งข้อความเข้าแชท LINE พร้อมแนบสถานะและเหตุผล
           if (liffReady && liff.isInClient()) {
             liff.sendMessages([
               {
                 type: 'text',
-                text: `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`
+                text: lineMsg
               }
             ]).then(() => {
               liff.closeWindow();
@@ -218,18 +297,24 @@
               document.getElementById('status').innerText += '\n(เซฟสำเร็จ แต่ส่งแชทไม่ได้)';
             });
           } else {
-             alert(`✅ บันทึก${pendingType}เรียบร้อยแล้ว\nสถานะ: ${result.workStatus || '-'}`);
+             alert(lineMsg);
           }
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
+          document.getElementById('checkin').style.display = 'block';
+          document.getElementById('checkout').style.display = 'block';
+          document.getElementById('openExternal').style.display = 'block';
         }
 
       } catch (err) {
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
         document.getElementById('camera-container').style.display = 'block';
         document.getElementById('preview').style.display = 'none';
+        document.getElementById('checkin').style.display = 'block';
+        document.getElementById('checkout').style.display = 'block';
+        document.getElementById('openExternal').style.display = 'block';
       }
     }
   </script>
