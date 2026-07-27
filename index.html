@@ -258,9 +258,21 @@
         const result = await res.json();
 
         if (result.success) {
+          // 🟢 แจ้งเตือนและส่งข้อความเข้าแชท (ระบบลางาน)
           alert('✅ ' + result.message);
+          
           if (liffReady && liff.isInClient()) {
-            liff.closeWindow();
+            let msgText = "📅 ยื่นคำร้อง" + leaveType + "เรียบร้อยแล้ว\n";
+            msgText += "พนักงาน: " + name + "\n";
+            msgText += "วันที่: " + startDate + " ถึง " + endDate + "\n";
+            msgText += "💬 เหตุผล: " + reason;
+
+            liff.sendMessages([{ type: 'text', text: msgText }])
+              .then(() => liff.closeWindow())
+              .catch((err) => {
+                console.error('LIFF sendMessages failed', err);
+                liff.closeWindow();
+              });
           } else {
             location.reload();
           }
@@ -272,7 +284,7 @@
       }
     };
 
-    // ------------------ ระบบลงเวลางาน/OT เดิม ------------------
+    // ------------------ ระบบลงเวลางาน/OT ------------------
     document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
     document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
     document.getElementById('checkinOT_SYMC').onclick = () => processAttendance('เข้างาน OT SYMC');
@@ -365,8 +377,35 @@
         const result = await res.json();
 
         if (result.success) {
+          // 🟢 แจ้งเตือนและส่งข้อความเข้าแชท (ระบบลงเวลา/OT)
           alert('✅ ' + result.message);
-          if (liffReady && liff.isInClient()) liff.closeWindow();
+          
+          if (liffReady && liff.isInClient()) {
+            const currentTime = new Date().toLocaleTimeString('th-TH', { hour12: false });
+            let msgText = "✅ บันทึก" + pendingType + "เรียบร้อยแล้ว\n";
+            msgText += "เวลา: " + currentTime + "\n";
+            msgText += "สถานะ: " + (result.workStatus || 'ปกติ') + "\n";
+            msgText += "พนักงาน: " + name;
+
+            // ตรวจสอบและต่อท้ายข้อความด้วยเหตุผล หรือ รายละเอียด OT
+            if (reason && reason !== "-") {
+              msgText += "\n💬 เหตุผล: " + reason;
+            }
+            if (otDetails && otDetails !== "-") {
+              msgText += "\n📝 รายละเอียด: " + otDetails;
+            }
+
+            liff.sendMessages([{ type: 'text', text: msgText }])
+              .then(() => liff.closeWindow())
+              .catch((err) => {
+                console.error('LIFF sendMessages failed', err);
+                liff.closeWindow();
+              });
+          } else {
+             // ถ้าเปิดจาก Browser นอก LINE
+             location.reload();
+          }
+
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
         }
@@ -377,8 +416,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
