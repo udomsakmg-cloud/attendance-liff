@@ -171,19 +171,19 @@
       document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // ตรวจสอบว่าเป็น "เข้างาน" และเลยเวลา 09:00 น. หรือไม่
+      // ตรวจสอบว่าเป็น "เข้างาน" และเลยเวลา 08:30 น. หรือไม่
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
 
-      if (type === 'เข้างาน' && currentTime > "09:00") {
+      if (type === 'เข้างาน' && currentTime > "08:30") {
         // หากมาสาย ให้แสดงกล่องกรอกเหตุผล และซ่อนปุ่มกดหลัก
         document.getElementById('reason-container').style.display = 'block';
         document.getElementById('checkin').style.display = 'none';
         document.getElementById('checkout').style.display = 'none';
         document.getElementById('openExternal').style.display = 'none';
-        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 09:00 น. กรุณากรอกเหตุผลด้านบน';
+        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:30 น. กรุณากรอกเหตุผลด้านบน';
       } else {
         // ปกติ หรือ เลิกงาน ให้ส่งข้อมูลทันที
         getLocationAndSubmit(cachedImageBase64, "-");
