@@ -21,18 +21,20 @@
     #videoStream {
       width: 100%;
       display: block;
-      transform: scaleX(-1); /* สลับซ้ายขวาให้เหมือนกระจก */
+      transform: scaleX(-1);
     }
     
     button {
-      width: 100%; padding: 16px; margin: 8px 0; font-size: 17px; font-weight: bold;
+      width: 100%; padding: 15px; margin: 6px 0; font-size: 16px; font-weight: bold;
       border: none; border-radius: 10px; color: white; cursor: pointer;
     }
-    #checkin { background: #06C755; }
-    #checkout { background: #FF5555; }
+    #checkin { background: #06C755; }     /* เขียว */
+    #checkout { background: #FF5555; }    /* แดง */
+    #checkinOT { background: #2b90d9; }   /* ฟ้า */
+    #checkoutOT { background: #f39c12; }  /* ส้ม */
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    /* กล่องกรอกเหตุผลตอนมาสาย */
+    /* กล่องกรอกเหตุผลกรณีมาสาย */
     #reason-container {
       display: none;
       max-width: 400px;
@@ -80,17 +82,19 @@
   <canvas id="canvas" style="display: none;"></canvas>
   <img id="preview" alt="รูปที่ถ่าย">
   
-  <!-- กล่องกรอกเหตุผลกรณีมาสาย (ซ่อนไว้ก่อน) -->
+  <!-- กล่องกรอกเหตุผลกรณีมาสาย -->
   <div id="reason-container">
-    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:30 น.)</label>
+    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 09:00 น.)</label>
     <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุเหตุผลความจำเป็นที่มาสาย:</p>
     <textarea id="lateReason" placeholder="เช่น รถติด, ฝนตกหนัก, ติดภารกิจด่วน..."></textarea>
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
   </div>
 
-  <button id="checkin">✅ เข้างาน (ถ่ายรูป)</button>
-  <button id="checkout">🔴 เลิกงาน (ถ่ายรูป)</button>
-  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้ากล้อง/GPS ไม่ทำงาน)</button>
+  <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป)</button>
+  <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป)</button>
+  <button id="checkinOT">🔵 เข้างาน OT (ไม่ถ่ายรูป)</button>
+  <button id="checkoutOT">🟠 เลิกงาน OT (ไม่ถ่ายรูป)</button>
+  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
 
@@ -104,7 +108,7 @@
     
     let pendingType = null;
     let liffReady = false;
-    let cachedImageBase64 = null;
+    let cachedImageBase64 = "";
     const video = document.getElementById('videoStream');
     const canvas = document.getElementById('canvas');
 
@@ -115,28 +119,28 @@
           audio: false 
         });
         video.srcObject = stream;
-        document.getElementById('status').innerText = '✅ กล้องพร้อมใช้งาน กดปุ่มเพื่อลงเวลาได้เลย';
+        document.getElementById('status').innerText = '✅ ระบบพร้อมใช้งาน กดปุ่มเพื่อลงเวลาได้เลย';
       } catch (err) {
-        document.getElementById('status').innerText = '❌ ไม่สามารถเข้าถึงกล้องได้: กรุณาอนุญาตสิทธิ์การเข้าถึงกล้อง';
+        document.getElementById('status').innerText = '⚠️ กล้องไม่พร้อมใช้งาน (หากลงเวลา OT ยังคงใช้งานได้ปกติ)';
       }
     }
-
-    document.getElementById('status').innerText = '1) กำลังโหลดระบบ...';
 
     if (typeof liff === 'undefined') {
       document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
     } else {
       liff.init({ liffId: LIFF_ID }).then(() => {
         liffReady = true;
-        document.getElementById('status').innerText = '2) กำลังเปิดกล้อง...';
         startCamera();
       }).catch(err => {
         document.getElementById('status').innerText = '❌ liff.init error: ' + err.message;
       });
     }
 
-    document.getElementById('checkin').onclick = () => takePhotoAndProcess('เข้างาน');
-    document.getElementById('checkout').onclick = () => takePhotoAndProcess('เลิกงาน');
+    // ผูก Event ให้แต่ละปุ่ม
+    document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
+    document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
+    document.getElementById('checkinOT').onclick = () => processAttendance('เข้างาน OT');
+    document.getElementById('checkoutOT').onclick = () => processAttendance('เลิกงาน OT');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -146,17 +150,31 @@
       }
     };
 
-    function takePhotoAndProcess(type) {
+    function processAttendance(type) {
       if (!liffReady) {
         alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
         return;
       }
+
+      pendingType = type;
+
+      // 🔵 ถ้าเป็นลงเวลา OT: ไม่ต้องถ่ายรูป
+      if (type.includes('OT')) {
+        cachedImageBase64 = ""; // ไม่ส่งรูปภาพ
+        document.getElementById('camera-container').style.display = 'none';
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('reason-container').style.display = 'none';
+        
+        // ข้ามไปดึงพิกัด GPS แล้วบันทึกทันที
+        getLocationAndSubmit("", "-");
+        return;
+      }
+
+      // 🟢/🔴 ถ้าเป็นงานปกติ: ต้องถ่ายรูป
       if (!video.srcObject) {
         alert("ไม่พบสัญญาณกล้อง กรุณาอนุญาตให้ใช้งานกล้อง");
         return;
       }
-
-      pendingType = type;
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -171,21 +189,17 @@
       document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // ตรวจสอบว่าเป็น "เข้างาน" และเลยเวลา 08:30 น. หรือไม่
+      // เช็คเวลาเข้างานสายสำหรับงานปกติ
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
 
-      if (type === 'เข้างาน' && currentTime > "08:30") {
-        // หากมาสาย ให้แสดงกล่องกรอกเหตุผล และซ่อนปุ่มกดหลัก
+      if (type === 'เข้างาน' && currentTime > "09:00") {
         document.getElementById('reason-container').style.display = 'block';
-        document.getElementById('checkin').style.display = 'none';
-        document.getElementById('checkout').style.display = 'none';
-        document.getElementById('openExternal').style.display = 'none';
-        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:30 น. กรุณากรอกเหตุผลด้านบน';
+        hideAllButtons();
+        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 09:00 น. กรุณากรอกเหตุผลด้านบน';
       } else {
-        // ปกติ หรือ เลิกงาน ให้ส่งข้อมูลทันที
         getLocationAndSubmit(cachedImageBase64, "-");
       }
     }
@@ -197,10 +211,25 @@
         alert("กรุณากรอกเหตุผลการมาสายก่อนดำเนินการต่อ");
         return;
       }
-      // ซ่อนกล่องกรอกเหตุผล แล้วเริ่มดึง GPS ส่งข้อมูล
       document.getElementById('reason-container').style.display = 'none';
       getLocationAndSubmit(cachedImageBase64, reasonText);
     };
+
+    function hideAllButtons() {
+      document.getElementById('checkin').style.display = 'none';
+      document.getElementById('checkout').style.display = 'none';
+      document.getElementById('checkinOT').style.display = 'none';
+      document.getElementById('checkoutOT').style.display = 'none';
+      document.getElementById('openExternal').style.display = 'none';
+    }
+
+    function showAllButtons() {
+      document.getElementById('checkin').style.display = 'block';
+      document.getElementById('checkout').style.display = 'block';
+      document.getElementById('checkinOT').style.display = 'block';
+      document.getElementById('checkoutOT').style.display = 'block';
+      document.getElementById('openExternal').style.display = 'block';
+    }
 
     function getLocationAndSubmit(imageBase64, reason) {
       document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
@@ -251,9 +280,7 @@
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
-          document.getElementById('checkin').style.display = 'block';
-          document.getElementById('checkout').style.display = 'block';
-          document.getElementById('openExternal').style.display = 'block';
+          showAllButtons();
           return;
         }
       }
@@ -284,7 +311,6 @@
             lineMsg += `\n💬 เหตุผล: ${reason}`;
           }
 
-          // ส่งข้อความเข้าแชท LINE พร้อมแนบสถานะและเหตุผล
           if (liffReady && liff.isInClient()) {
             liff.sendMessages([
               {
@@ -303,18 +329,14 @@
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
-          document.getElementById('checkin').style.display = 'block';
-          document.getElementById('checkout').style.display = 'block';
-          document.getElementById('openExternal').style.display = 'block';
+          showAllButtons();
         }
 
       } catch (err) {
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
         document.getElementById('camera-container').style.display = 'block';
         document.getElementById('preview').style.display = 'none';
-        document.getElementById('checkin').style.display = 'block';
-        document.getElementById('checkout').style.display = 'block';
-        document.getElementById('openExternal').style.display = 'block';
+        showAllButtons();
       }
     }
   </script>
