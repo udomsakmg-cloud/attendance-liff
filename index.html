@@ -90,10 +90,10 @@
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
   </div>
 
-  <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป)</button>
-  <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป)</button>
-  <button id="checkinOT">🔵 เข้างาน OT (ไม่ถ่ายรูป)</button>
-  <button id="checkoutOT">🟠 เลิกงาน OT (ไม่ถ่ายรูป)</button>
+  <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
+  <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป + GPS)</button>
+  <button id="checkinOT">🔵 เข้างาน OT (กดบันทึกทันที)</button>
+  <button id="checkoutOT">🟠 เลิกงาน OT (กดบันทึกทันที)</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
@@ -158,19 +158,18 @@
 
       pendingType = type;
 
-      // 🔵 ถ้าเป็นลงเวลา OT: ไม่ต้องถ่ายรูป
+      // 🔵 ถ้าเป็นลงเวลา OT: ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
       if (type.includes('OT')) {
-        cachedImageBase64 = ""; // ไม่ส่งรูปภาพ
+        cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
         document.getElementById('preview').style.display = 'none';
         document.getElementById('reason-container').style.display = 'none';
         
-        // ข้ามไปดึงพิกัด GPS แล้วบันทึกทันที
-        getLocationAndSubmit("", "-");
+        submitData("-", "-", "", "-");
         return;
       }
 
-      // 🟢/🔴 ถ้าเป็นงานปกติ: ต้องถ่ายรูป
+      // 🟢/🔴 ถ้าเป็นงานปกติ: ถ่ายรูป + ดึง GPS
       if (!video.srcObject) {
         alert("ไม่พบสัญญาณกล้อง กรุณาอนุญาตให้ใช้งานกล้อง");
         return;
