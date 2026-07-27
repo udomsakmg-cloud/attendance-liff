@@ -5,16 +5,33 @@
   <meta charset="UTF-8">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px 15px; }
+    body { font-family: sans-serif; text-align: center; padding: 20px 15px; background-color: #f4f6f9; }
+    h2 { margin-top: 0; color: #333; }
+    
+    /* กรอบวิดีโอกล้อง */
+    #camera-container {
+      width: 100%;
+      max-width: 400px;
+      margin: 0 auto 15px auto;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    #videoStream {
+      width: 100%;
+      display: block;
+      transform: scaleX(-1); /* สลับซ้ายขวาให้เหมือนกระจก (เฉพาะตอนมอง) */
+    }
+    
     button {
-      width: 100%; padding: 16px; margin: 8px 0; font-size: 17px;
+      width: 100%; padding: 16px; margin: 8px 0; font-size: 17px; font-weight: bold;
       border: none; border-radius: 10px; color: white; cursor: pointer;
     }
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    #photoInput { display: none; }
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; color: #333; font-weight: bold; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
@@ -22,18 +39,24 @@
 <body>
   <h2>📍 ลงเวลางาน</h2>
 
-  <input type="file" id="photoInput" accept="image/*" capture="user">
-  <img id="preview" alt="รูปตัวอย่าง">
+  <!-- พื้นที่แสดงกล้องสด -->
+  <div id="camera-container">
+    <!-- playsinline สำคัญมาก เพื่อไม่ให้วิดีโอเด้งเต็มจอในมือถือบางรุ่น -->
+    <video id="videoStream" autoplay playsinline></video>
+  </div>
   
-  <button id="checkin">✅ เข้างาน</button>
-  <button id="checkout">🔴 เลิกงาน</button>
-  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้า GPS ไม่ทำงาน)</button>
+  <!-- Canvas ซ่อนไว้สำหรับแคปเจอร์ภาพจากวิดีโอ -->
+  <canvas id="canvas" style="display: none;"></canvas>
+  <img id="preview" alt="รูปที่ถ่าย">
   
-  <!-- กล่องแสดงสถานะ -->
+  <button id="checkin">✅ เข้างาน (ถ่ายรูป)</button>
+  <button id="checkout">🔴 เลิกงาน (ถ่ายรูป)</button>
+  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก (ถ้ากล้อง/GPS ไม่ทำงาน)</button>
+  
   <div id="status">0) กำลังเตรียมระบบ...</div>
 
   <script>
-    // ดักจับ Error ในหน้าเว็บทั้งหมด (เพื่อดูว่ามีโค้ดส่วนไหนพัง)
+    // ดัก Error เผื่อไว้ดูข้อผิดพลาด
     window.onerror = function(msg, url, line) {
       document.getElementById('status').innerText = '❌ Error บรรทัด ' + line + ': ' + msg;
     };
@@ -43,37 +66,41 @@
     
     let pendingType = null;
     let liffReady = false;
+    const video = document.getElementById('videoStream');
+    const canvas = document.getElementById('canvas');
 
-    document.getElementById('status').innerText = '1) กำลังโหลด LIFF SDK...';
+    // ฟังก์ชันเปิดกล้องทันทีเมื่อโหลดหน้าเว็บ
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user" }, // บังคับกล้องหน้า
+          audio: false 
+        });
+        video.srcObject = stream;
+        document.getElementById('status').innerText = '✅ กล้องพร้อมใช้งาน กดปุ่มเพื่อลงเวลาได้เลย';
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ ไม่สามารถเข้าถึงกล้องได้: กรุณาอนุญาตสิทธิ์การเข้าถึงกล้อง';
+      }
+    }
 
-    // เช็คว่าโหลดสคริปต์ LINE มาได้ไหม
+    document.getElementById('status').innerText = '1) กำลังโหลดระบบ...';
+
+    // โหลด LIFF
     if (typeof liff === 'undefined') {
-      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ (เช็คอินเทอร์เน็ต)';
+      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
     } else {
-      document.getElementById('status').innerText = '2) กำลังเชื่อมต่อระบบ LINE...';
-      
-      // ตั้งเวลาจับผิด หากเชื่อมต่อ LINE นานเกิน 7 วินาที
-      let isLiffInit = false;
-      setTimeout(() => {
-        if (!isLiffInit) {
-          document.getElementById('status').innerText = '❌ เชื่อมต่อ LINE นานผิดปกติ (LIFF ID อาจผิด หรือแอป LINE มีปัญหา)';
-        }
-      }, 7000);
-
-      // เริ่มเชื่อมต่อ
       liff.init({ liffId: LIFF_ID }).then(() => {
-        isLiffInit = true;
         liffReady = true;
-        document.getElementById('status').innerText = '✅ พร้อมใช้งาน กดปุ่มเพื่อลงเวลา';
+        document.getElementById('status').innerText = '2) กำลังเปิดกล้อง...';
+        startCamera(); // เรียกเปิดกล้องเมื่อ LIFF พร้อม
       }).catch(err => {
-        isLiffInit = true;
         document.getElementById('status').innerText = '❌ liff.init error: ' + err.message;
       });
     }
 
     // --- ส่วนปุ่มกดต่างๆ ---
-    document.getElementById('checkin').onclick = () => startProcess('เข้างาน');
-    document.getElementById('checkout').onclick = () => startProcess('เลิกงาน');
+    document.getElementById('checkin').onclick = () => takePhotoAndProcess('เข้างาน');
+    document.getElementById('checkout').onclick = () => takePhotoAndProcess('เลิกงาน');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -83,36 +110,39 @@
       }
     };
 
-    function startProcess(type) {
+    // ฟังก์ชันหลัก: แคปเจอร์ภาพ -> ดึง GPS -> ส่งข้อมูล
+    function takePhotoAndProcess(type) {
       if (!liffReady) {
         alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
         return;
       }
-      pendingType = type;
-      document.getElementById('preview').style.display = 'none';
-      document.getElementById('preview').src = '';
-      
-      const input = document.getElementById('photoInput');
-      input.value = '';
-      input.click();
-    }
-
-    document.getElementById('photoInput').onchange = function(e) {
-      const file = e.target.files[0];
-      if (!file) {
-        document.getElementById('status').innerText = '⚠️ ยกเลิกการถ่ายรูป';
+      if (!video.srcObject) {
+        alert("ไม่พบสัญญาณกล้อง กรุณาอนุญาตให้ใช้งานกล้อง");
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = function() {
-        const imageBase64 = reader.result;
-        document.getElementById('preview').src = imageBase64;
-        document.getElementById('preview').style.display = 'block';
-        getLocationAndSubmit(imageBase64);
-      };
-      reader.readAsDataURL(file);
-    };
+      pendingType = type;
+
+      // 1. แคปเจอร์ภาพจาก Video ลง Canvas
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      // พลิกภาพกลับมาให้เป็นปกติ (ไม่กลับซ้ายขวา) ก่อนเซฟ
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // แปลงเป็น Base64 (คุณภาพ 80% เพื่อลดขนาดไฟล์)
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      
+      // ซ่อนวิดีโอ โชว์ภาพที่เพิ่งถ่ายค้างไว้
+      document.getElementById('camera-container').style.display = 'none';
+      document.getElementById('preview').src = imageBase64;
+      document.getElementById('preview').style.display = 'block';
+
+      // 2. ไปดึง GPS และส่งข้อมูลต่อ
+      getLocationAndSubmit(imageBase64);
+    }
 
     function getLocationAndSubmit(imageBase64) {
       document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
@@ -161,6 +191,9 @@
         name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name || name.trim() === "") {
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
+          // กลับมาเปิดกล้องใหม่เผื่อกดพลาด
+          document.getElementById('camera-container').style.display = 'block';
+          document.getElementById('preview').style.display = 'none';
           return;
         }
       }
@@ -201,10 +234,15 @@
           }
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
+          // ถ้าพลาด เปิดกล้องคืน
+          document.getElementById('camera-container').style.display = 'block';
+          document.getElementById('preview').style.display = 'none';
         }
 
       } catch (err) {
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
+        document.getElementById('camera-container').style.display = 'block';
+        document.getElementById('preview').style.display = 'none';
       }
     }
   </script>
