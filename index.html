@@ -34,10 +34,12 @@
     #checkoutOT_SYMC { background: #f39c12; }   /* ส้ม */
     #checkinOT_ITEL { background: #8e44ad; }    /* ม่วง */
     #checkoutOT_ITEL { background: #d35400; }   /* น้ำตาลส้ม */
+    #checkinOT_OTHER { background: #6c757d; }   /* เทา */
+    #checkoutOT_OTHER { background: #343a40; }  /* เทาเข้ม (OT อื่น) */
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
-    /* กล่องกรอกเหตุผลกรณีมาสาย */
-    #reason-container, #ot-details-container {
+    /* กล่องกรอกข้อมูล */
+    #reason-container, #ot-details-container, #other-ot-container {
       display: none;
       max-width: 400px;
       margin: 15px auto;
@@ -47,38 +49,24 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       text-align: left;
     }
-    #reason-container label {
-      font-weight: bold;
-      color: #d9534f;
-      display: block;
-      margin-bottom: 8px;
-    }
-    #ot-details-container label {
-      font-weight: bold;
-      color: #2b90d9;
-      display: block;
-      margin-bottom: 8px;
-    }
-    textarea {
+    #reason-container label { font-weight: bold; color: #d9534f; display: block; margin-bottom: 8px; }
+    #ot-details-container label { font-weight: bold; color: #2b90d9; display: block; margin-bottom: 8px; }
+    #other-ot-container label { font-weight: bold; color: #343a40; display: block; margin-bottom: 8px; }
+
+    input[type="number"], textarea {
       width: 100%;
-      height: 80px;
       padding: 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
       box-sizing: border-box;
       font-size: 15px;
-      resize: none;
+      margin-bottom: 10px;
     }
-    #submitReasonBtn {
-      background: #f0ad4e;
-      color: white;
-      margin-top: 10px;
-    }
-    #submitOtDetailsBtn {
-      background: #2b90d9;
-      color: white;
-      margin-top: 10px;
-    }
+    textarea { height: 80px; resize: none; margin-bottom: 0; }
+
+    #submitReasonBtn { background: #f0ad4e; color: white; margin-top: 10px; }
+    #submitOtDetailsBtn { background: #2b90d9; color: white; margin-top: 10px; }
+    #submitOtherOtBtn { background: #343a40; color: white; margin-top: 10px; }
 
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; color: #333; font-weight: bold; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
@@ -103,12 +91,21 @@
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
   </div>
 
-  <!-- กล่องกรอกรายละเอียดงาน OT -->
+  <!-- กล่องกรอกรายละเอียดงาน OT SYMC / ITEL -->
   <div id="ot-details-container">
     <label>📝 กรอกรายละเอียดงาน OT</label>
     <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุรายละเอียดงานที่ทำในการปฏิบัติงาน OT ครั้งนี้:</p>
     <textarea id="otDetails" placeholder="เช่น ซ่อมบำรุงสายไฟเบอร์ออฟติก, ติดตั้งอุปกรณ์..."></textarea>
     <button id="submitOtDetailsBtn">📤 ยืนยันการบันทึกเลิกงาน OT</button>
+  </div>
+
+  <!-- กล่องกรอกข้อมูล OT อื่น (ใส่เงินเอง + เหตุผล) -->
+  <div id="other-ot-container">
+    <label>⚙️ กรอกข้อมูล OT อื่น</label>
+    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณากำหนดจำนวนเงินค่า OT และระบุเหตุผล/รายละเอียดงาน:</p>
+    <input type="number" id="otCustomFee" placeholder="จำนวนเงิน OT (บาท) เช่น 100, 300..." min="0">
+    <textarea id="otOtherDetails" placeholder="เหตุผล / รายละเอียดงาน OT ครั้งนี้..."></textarea>
+    <button id="submitOtherOtBtn">📤 ยืนยันการบันทึก OT อื่น</button>
   </div>
 
   <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
@@ -117,6 +114,8 @@
   <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กรอกรายละเอียดงาน)</button>
   <button id="checkinOT_ITEL">🟣 เข้างาน OT ITEL (กดบันทึกทันที)</button>
   <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กรอกรายละเอียดงาน)</button>
+  <button id="checkinOT_OTHER">⚪ เข้างาน OT อื่น (กดบันทึกทันที)</button>
+  <button id="checkoutOT_OTHER">⚫ เลิกงาน OT อื่น (ใส่ค่า OT + เหตุผล)</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
@@ -159,13 +158,15 @@
       });
     }
 
-    // ผูก Event ให้แต่ละปุ่ม
+    // ผูก Event ปุ่มกด
     document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
     document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
     document.getElementById('checkinOT_SYMC').onclick = () => processAttendance('เข้างาน OT SYMC');
     document.getElementById('checkoutOT_SYMC').onclick = () => processAttendance('เลิกงาน OT SYMC');
     document.getElementById('checkinOT_ITEL').onclick = () => processAttendance('เข้างาน OT ITEL');
     document.getElementById('checkoutOT_ITEL').onclick = () => processAttendance('เลิกงาน OT ITEL');
+    document.getElementById('checkinOT_OTHER').onclick = () => processAttendance('เข้างาน OT อื่น');
+    document.getElementById('checkoutOT_OTHER').onclick = () => processAttendance('เลิกงาน OT อื่น');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -183,28 +184,45 @@
 
       pendingType = type;
 
-      // 🔵/🟣 เข้างาน OT: ส่งบันทึกทันที
-      if (type === 'เข้างาน OT SYMC' || type === 'เข้างาน OT ITEL') {
+      // ⚪ เข้างาน OT (SYMC / ITEL / อื่นๆ): ส่งบันทึกทันที
+      if (type === 'เข้างาน OT SYMC' || type === 'เข้างาน OT ITEL' || type === 'เข้างาน OT อื่น') {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
         document.getElementById('preview').style.display = 'none';
         document.getElementById('reason-container').style.display = 'none';
         document.getElementById('ot-details-container').style.display = 'none';
+        document.getElementById('other-ot-container').style.display = 'none';
         
-        submitData("-", "-", "", "-", "-");
+        submitData("-", "-", "", "-", "-", null);
         return;
       }
 
-      // 🟠/🟤 เลิกงาน OT: กรอกรายละเอียดงาน
+      // 🟠/🟤 เลิกงาน OT SYMC / ITEL
       if (type === 'เลิกงาน OT SYMC' || type === 'เลิกงาน OT ITEL') {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
         document.getElementById('preview').style.display = 'none';
         document.getElementById('reason-container').style.display = 'none';
+        document.getElementById('other-ot-container').style.display = 'none';
         document.getElementById('ot-details-container').style.display = 'block';
         document.getElementById('otDetails').value = "";
         hideAllButtons();
         document.getElementById('status').innerText = '📝 กรุณากรอกรายละเอียดงาน OT ด้านบน';
+        return;
+      }
+
+      // ⚫ เลิกงาน OT อื่น (กรอกเงินเอง + เหตุผล)
+      if (type === 'เลิกงาน OT อื่น') {
+        cachedImageBase64 = "";
+        document.getElementById('camera-container').style.display = 'none';
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('reason-container').style.display = 'none';
+        document.getElementById('ot-details-container').style.display = 'none';
+        document.getElementById('other-ot-container').style.display = 'block';
+        document.getElementById('otCustomFee').value = "";
+        document.getElementById('otOtherDetails').value = "";
+        hideAllButtons();
+        document.getElementById('status').innerText = '⚙️ กรุณากรอกจำนวนเงินค่า OT และเหตุผลด้านบน';
         return;
       }
 
@@ -227,7 +245,6 @@
       document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // เช็คเวลาเข้างานสายสำหรับงานปกติ (หลัง 08:30 น.)
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -242,7 +259,7 @@
       }
     }
 
-    // ปุ่มกดส่งเหตุผลกรณีมาสาย
+    // ส่งเหตุผลกรณีมาสาย
     document.getElementById('submitReasonBtn').onclick = () => {
       const reasonText = document.getElementById('lateReason').value.trim();
       if (!reasonText) {
@@ -253,7 +270,7 @@
       getLocationAndSubmit(cachedImageBase64, reasonText, "-");
     };
 
-    // ปุ่มกดส่งรายละเอียดงาน OT
+    // ส่งรายละเอียดงาน OT SYMC / ITEL
     document.getElementById('submitOtDetailsBtn').onclick = () => {
       const detailsText = document.getElementById('otDetails').value.trim();
       if (!detailsText) {
@@ -261,7 +278,25 @@
         return;
       }
       document.getElementById('ot-details-container').style.display = 'none';
-      submitData("-", "-", "", "-", detailsText);
+      submitData("-", "-", "", "-", detailsText, null);
+    };
+
+    // ส่งข้อมูล OT อื่น (เงิน + เหตุผล)
+    document.getElementById('submitOtherOtBtn').onclick = () => {
+      const customFee = document.getElementById('otCustomFee').value.trim();
+      const detailsText = document.getElementById('otOtherDetails').value.trim();
+      
+      if (!customFee || isNaN(customFee) || parseFloat(customFee) <= 0) {
+        alert("กรุณากรอกจำนวนเงินค่า OT ให้ถูกต้อง (ต้องมากกว่า 0)");
+        return;
+      }
+      if (!detailsText) {
+        alert("กรุณากรอกเหตุผล / รายละเอียดงาน OT");
+        return;
+      }
+
+      document.getElementById('other-ot-container').style.display = 'none';
+      submitData("-", "-", "", "-", detailsText, parseFloat(customFee));
     };
 
     function hideAllButtons() {
@@ -271,6 +306,8 @@
       document.getElementById('checkoutOT_SYMC').style.display = 'none';
       document.getElementById('checkinOT_ITEL').style.display = 'none';
       document.getElementById('checkoutOT_ITEL').style.display = 'none';
+      document.getElementById('checkinOT_OTHER').style.display = 'none';
+      document.getElementById('checkoutOT_OTHER').style.display = 'none';
       document.getElementById('openExternal').style.display = 'none';
     }
 
@@ -281,6 +318,8 @@
       document.getElementById('checkoutOT_SYMC').style.display = 'block';
       document.getElementById('checkinOT_ITEL').style.display = 'block';
       document.getElementById('checkoutOT_ITEL').style.display = 'block';
+      document.getElementById('checkinOT_OTHER').style.display = 'block';
+      document.getElementById('checkoutOT_OTHER').style.display = 'block';
       document.getElementById('openExternal').style.display = 'block';
     }
 
@@ -305,7 +344,7 @@
         gpsFinished = true;
         clearTimeout(gpsTimeout);
         
-        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails);
+        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails, null);
       }, (err) => {
         if (gpsFinished) return;
         gpsFinished = true;
@@ -314,7 +353,7 @@
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    async function submitData(lat, lng, imageBase64, reason, otDetails) {
+    async function submitData(lat, lng, imageBase64, reason, otDetails, customOtFee) {
       document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
 
       let name = null;
@@ -323,9 +362,7 @@
           const profile = await liff.getProfile();
           name = profile.displayName;
         }
-      } catch (err) {
-        name = null;
-      }
+      } catch (err) { name = null; }
 
       if (!name) {
         name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
@@ -348,7 +385,8 @@
           lng: lng,
           image: imageBase64,
           reason: reason,
-          otDetails: otDetails || "-"
+          otDetails: otDetails || "-",
+          customOtFee: customOtFee || null
         };
 
         const res = await fetch(SCRIPT_URL, {
@@ -365,19 +403,14 @@
             lineMsg += `\n💰 ค่า OT: ${result.otFee}`;
           }
           if (otDetails && otDetails !== '-') {
-            lineMsg += `\n📝 รายละเอียดงาน: ${otDetails}`;
+            lineMsg += `\n📝 รายละเอียด/เหตุผล: ${otDetails}`;
           }
           if (reason && reason !== '-') {
-            lineMsg += `\n💬 เหตุผล: ${reason}`;
+            lineMsg += `\n💬 เหตุผลมาสาย: ${reason}`;
           }
 
           if (liffReady && liff.isInClient()) {
-            liff.sendMessages([
-              {
-                type: 'text',
-                text: lineMsg
-              }
-            ]).then(() => {
+            liff.sendMessages([{ type: 'text', text: lineMsg }]).then(() => {
               liff.closeWindow();
             }).catch((err) => {
               document.getElementById('status').innerText += '\n(เซฟสำเร็จ แต่ส่งแชทไม่ได้)';
