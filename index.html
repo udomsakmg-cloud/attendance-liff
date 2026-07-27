@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบลงเวลางานและจัดการ OT</title>
-  <!-- Bootstrap 5 CSS สำหรับความสวยงามและการจัดวาง -->
+  <!-- Bootstrap 5 CSS สำหรับความสวยงาม -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
-<body class="bg-light">
+<body class="bg-dark text-light"> <!-- ปรับเป็นโทนเข้มให้เข้ากับธีมไฮเทค -->
 
   <div class="container py-4">
-    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
-      <div class="card-header bg-primary text-white text-center py-3">
-        <h4 class="mb-0">📋 บันทึกเวลาทำงาน / OT / ลางาน</h4>
+    <div class="card shadow-sm mx-auto bg-dark border-secondary text-light" style="max-width: 500px;">
+      <div class="card-header bg-primary text-white text-center py-3 border-secondary">
+        <h4 class="mb-0">📋 บันทึกเวลาทำงาน / OT</h4>
       </div>
       <div class="card-body">
         
@@ -23,16 +23,16 @@
           
           <!-- ชื่อพนักงาน -->
           <div class="mb-3">
-            <label for="nameInput" class="form-label">👤 ชื่อ-นามสกุลพนักงาน:</label>
-            <input type="text" class="form-control" id="nameInput" placeholder="กรอกชื่อของคุณ" required>
+            <label for="nameInput" class="form-label">👤 ชื่อพนักงาน (รหัส):</label>
+            <input type="text" class="form-control bg-secondary text-light border-dark" id="nameInput" placeholder="เช่น NMBservice_KKN" required>
           </div>
 
           <!-- ประเภทรายการ -->
           <div class="mb-3">
             <label for="typeInput" class="form-label">📍 เลือกประเภทการบันทึก:</label>
-            <select class="form-select" id="typeInput" required>
-              <option value="เข้างาน">เข้างานปกติ</option>
-              <option value="เลิกงาน">เลิกงานปกติ</option>
+            <select class="form-select bg-secondary text-light border-dark" id="typeInput" required>
+              <option value="เข้างาน">เข้างาน</option>
+              <option value="เลิกงาน">เลิกงาน</option>
               <option value="เข้างาน OT SYMC">เข้างาน OT SYMC</option>
               <option value="เลิกงาน OT SYMC">เลิกงาน OT SYMC</option>
               <option value="เข้างาน OT ITEL">เข้างาน OT ITEL</option>
@@ -44,18 +44,18 @@
           <!-- ช่องกรอกค่า OT อื่นๆ (ซ่อนไว้ก่อน จะแสดงเฉพาะตอนเลือก OT อื่น) -->
           <div class="mb-3" id="customOtContainer" style="display: none;">
             <label for="customOtFee" class="form-label">💰 ระบุค่า OT (บาท):</label>
-            <input type="number" class="form-control" id="customOtFee" placeholder="เช่น 300">
+            <input type="number" class="form-control bg-secondary text-light border-dark" id="customOtFee" placeholder="เช่น 300">
           </div>
 
           <!-- รายละเอียด / เหตุผล -->
           <div class="mb-3">
             <label for="reasonInput" class="form-label">📝 รายละเอียด / เหตุผล (ถ้ามี):</label>
-            <textarea class="form-control" id="reasonInput" rows="2" placeholder="ระบุเหตุผล หรือรายละเอียดงาน"></textarea>
+            <textarea class="form-control bg-secondary text-light border-dark" id="reasonInput" rows="2" placeholder="ระบุเหตุผล เช่น มาสายเพราะรถติด หรือรายละเอียดงาน"></textarea>
           </div>
 
           <!-- ปุ่มกดส่งข้อมูล -->
-          <div class="d-grid">
-            <button type="submit" class="accumulator-btn btn btn-success btn-lg" id="submitBtn">
+          <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
               ✅ บันทึกข้อมูล
             </button>
           </div>
@@ -66,13 +66,13 @@
     </div>
   </div>
 
-  <!-- JavaScript สำหรับควบคุม LIFF และเชื่อมต่อ Google Apps Script -->
+  <!-- JavaScript -->
   <script>
     // ⚠️ [สำคัญ] นำ Web App URL ที่ได้จากการ Deploy Google Apps Script มาใส่ตรงนี้
-    const WEB_APP_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZp93MR15Yc-haCY1BBVOmAW3KyYlN3mZq7_Bhu7qfiJtENrgJWF7dX9HUKyYOubSmGA/exec";
     
     // ⚠️ [สำคัญ] ใส่ LIFF ID ของคุณที่นี่
-    const LIFF_ID = "YOUR_LIFF_ID_HERE"; 
+    const LIFF_ID = "2010782987-4mjGpChs"; 
 
     let userLineId = "-";
 
@@ -89,7 +89,7 @@
               userLineId = context.userId;
             }
             
-            // (ทางเลือก) ดึงชื่อ Display Name ของ LINE มาเติมให้อัตโนมัติ
+            // ดึงชื่อ Display Name ของ LINE มาเติมให้อัตโนมัติ (ถ้ายังไม่ได้กรอก)
             liff.getProfile().then(profile => {
               const nameInput = document.getElementById('nameInput');
               if (nameInput && !nameInput.value) {
@@ -120,18 +120,21 @@
 
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
-      submitBtn.innerText = "กำลังบันทึก...";
+      submitBtn.innerText = "กำลังบันทึกข้อมูล...";
+
+      // ดึงเวลาปัจจุบันสำหรับแสดงในแชท
+      const currentTime = new Date().toLocaleTimeString('th-TH', { hour12: false });
 
       // รวบรวมข้อมูลจากฟอร์ม
       const payload = {
-        action: "checkIn", // แยกประเภทการทำงานฝั่ง Apps Script
+        action: "checkIn",
         userId: userLineId,
         name: document.getElementById('nameInput').value.trim(),
         type: document.getElementById('typeInput').value,
         customOtFee: document.getElementById('customOtFee').value || 0,
         otDetails: document.getElementById('reasonInput').value.trim(),
         reason: document.getElementById('reasonInput').value.trim(),
-        lat: "-", // หากต้องการดึงพิกัด GPS จริง สามารถใส่ Geolocation API เพิ่มได้ที่นี่
+        lat: "-", 
         lng: "-"
       };
 
@@ -146,11 +149,43 @@
         submitBtn.innerText = "✅ บันทึกข้อมูล";
 
         if (data.success) {
-          // 🟢 แจ้งเตือนพนักงานทันทีเมื่อบันทึกสำเร็จ
-          alert("✅ " + data.message + (data.otFee && data.otFee !== "-" ? "\n💰 ค่า OT: " + data.otFee : ""));
           
-          // ล้างฟอร์มหรือปิดหน้าต่าง LIFF ตามต้องการ
-          // liff.closeWindow();
+          // 🟢 เมื่อบันทึกสำเร็จ ให้ส่งข้อความเข้าแชทฝั่งผู้ใช้ (ฝั่งขวามือ สีเขียว)
+          if (liff.isInClient()) {
+            
+            // สร้างรูปแบบข้อความให้เหมือนในรูปตัวอย่าง
+            let msgText = "✅ บันทึก" + payload.type + "เรียบร้อยแล้ว\n";
+            msgText += "เวลา: " + currentTime + "\n";
+            msgText += "สถานะ: " + (data.workStatus || 'ปกติ') + "\n";
+            msgText += "พนักงาน: " + payload.name;
+            
+            // ถ้ามีเหตุผลให้แสดงด้วย
+            if (payload.reason && payload.reason !== "") {
+              msgText += "\n💬 เหตุผล: " + payload.reason;
+            }
+
+            // ส่งข้อความในฐานะผู้ใช้
+            liff.sendMessages([
+              {
+                type: 'text',
+                text: msgText
+              }
+            ]).then(() => {
+              // ปิดหน้าต่าง LIFF กลับไปที่แชท
+              liff.closeWindow();
+            }).catch((err) => {
+              console.error('LIFF sendMessages failed', err);
+              // แจ้งเตือนธรรมดาถ้าส่งข้อความไม่ผ่าน แล้วค่อยปิดหน้าต่าง
+              alert("✅ บันทึกข้อมูลสำเร็จ (แต่ส่งข้อความเข้าแชทไม่ได้)");
+              liff.closeWindow();
+            });
+
+          } else {
+             // กรณีไม่ได้เปิดผ่านแอป LINE (เช่น เปิดเบราว์เซอร์ในคอม)
+             alert("✅ บันทึกข้อมูลเรียบร้อยแล้ว");
+             window.close();
+          }
+
         } else {
           alert("❌ เกิดข้อผิดพลาด: " + data.message);
         }
