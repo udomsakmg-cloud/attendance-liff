@@ -34,7 +34,6 @@
     #checkoutOT_SYMC { background: #f39c12; }   /* ส้ม */
     #checkinOT_ITEL { background: #8e44ad; }    /* ม่วง */
     #checkoutOT_ITEL { background: #d35400; }   /* น้ำตาลส้ม */
-    #getOtSummary { background: #17a2b8; }      /* ฟ้าอมเขียว (เช็คยอด OT) */
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
     /* กล่องกรอกเหตุผลกรณีมาสาย */
@@ -118,7 +117,6 @@
   <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กรอกรายละเอียดงาน)</button>
   <button id="checkinOT_ITEL">🟣 เข้างาน OT ITEL (กดบันทึกทันที)</button>
   <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กรอกรายละเอียดงาน)</button>
-  <button id="getOtSummary">📊 เช็คยอด OT สะสมของฉัน</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
@@ -168,58 +166,6 @@
     document.getElementById('checkoutOT_SYMC').onclick = () => processAttendance('เลิกงาน OT SYMC');
     document.getElementById('checkinOT_ITEL').onclick = () => processAttendance('เข้างาน OT ITEL');
     document.getElementById('checkoutOT_ITEL').onclick = () => processAttendance('เลิกงาน OT ITEL');
-
-    // ปุ่มเรียกดูยอด OT สะสมแบบแยก SYMC และ ITEL
-    document.getElementById('getOtSummary').onclick = async () => {
-      if (!liffReady) {
-        alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
-        return;
-      }
-
-      document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
-      let name = null;
-      try {
-        if (liffReady && liff.isLoggedIn && liff.isLoggedIn()) {
-          const profile = await liff.getProfile();
-          name = profile.displayName;
-        }
-      } catch (err) { name = null; }
-
-      if (!name) {
-        name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณเพื่อเช็คยอด OT:');
-        if (!name || name.trim() === "") return;
-      }
-
-      document.getElementById('status').innerText = '⏳ กำลังคำนวณยอด OT สะสม...';
-
-      try {
-        const res = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'getOT', name: name })
-        });
-        const result = await res.json();
-
-        if (result.success) {
-          const msg = `💰 ยอด OT สะสมของคุณ: ${result.userName}\n` +
-                      `------------------------------\n` +
-                      `🔵 OT SYMC:\n` +
-                      `   • จำนวน: ${result.symcCount} ครั้ง\n` +
-                      `   • ยอดรวม: ${result.symcTotal.toLocaleString()} บาท\n\n` +
-                      `🟣 OT ITEL:\n` +
-                      `   • จำนวน: ${result.itelCount} ครั้ง\n` +
-                      `   • ยอดรวม: ${result.itelTotal.toLocaleString()} บาท\n` +
-                      `------------------------------\n` +
-                      `💵 รวม OT ทั้งหมด: ${result.grandTotal.toLocaleString()} บาท (${result.grandCount} ครั้ง)`;
-          
-          document.getElementById('status').innerText = '✅ ดึงข้อมูลสำเร็จ\n\n' + msg;
-          alert(msg);
-        } else {
-          document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
-        }
-      } catch (err) {
-        document.getElementById('status').innerText = '❌ ดึงข้อมูลไม่สำเร็จ: ' + err.message;
-      }
-    };
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -325,7 +271,6 @@
       document.getElementById('checkoutOT_SYMC').style.display = 'none';
       document.getElementById('checkinOT_ITEL').style.display = 'none';
       document.getElementById('checkoutOT_ITEL').style.display = 'none';
-      document.getElementById('getOtSummary').style.display = 'none';
       document.getElementById('openExternal').style.display = 'none';
     }
 
@@ -336,7 +281,6 @@
       document.getElementById('checkoutOT_SYMC').style.display = 'block';
       document.getElementById('checkinOT_ITEL').style.display = 'block';
       document.getElementById('checkoutOT_ITEL').style.display = 'block';
-      document.getElementById('getOtSummary').style.display = 'block';
       document.getElementById('openExternal').style.display = 'block';
     }
 
