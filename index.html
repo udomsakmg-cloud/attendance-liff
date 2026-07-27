@@ -37,7 +37,7 @@
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
     /* กล่องกรอกเหตุผลกรณีมาสาย */
-    #reason-container {
+    #reason-container, #ot-details-container {
       display: none;
       max-width: 400px;
       margin: 15px auto;
@@ -53,7 +53,13 @@
       display: block;
       margin-bottom: 8px;
     }
-    #lateReason {
+    #ot-details-container label {
+      font-weight: bold;
+      color: #2b90d9;
+      display: block;
+      margin-bottom: 8px;
+    }
+    textarea {
       width: 100%;
       height: 80px;
       padding: 10px;
@@ -65,6 +71,11 @@
     }
     #submitReasonBtn {
       background: #f0ad4e;
+      color: white;
+      margin-top: 10px;
+    }
+    #submitOtDetailsBtn {
+      background: #2b90d9;
       color: white;
       margin-top: 10px;
     }
@@ -92,12 +103,20 @@
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
   </div>
 
+  <!-- กล่องกรอกรายละเอียดงาน OT -->
+  <div id="ot-details-container">
+    <label>📝 กรอกรายละเอียดงาน OT</label>
+    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุรายละเอียดงานที่ทำในการปฏิบัติงาน OT ครั้งนี้:</p>
+    <textarea id="otDetails" placeholder="เช่น ซ่อมบำรุงสายไฟเบอร์ออฟติก, ติดตั้งอุปกรณ์..."></textarea>
+    <button id="submitOtDetailsBtn">📤 ยืนยันการบันทึกเลิกงาน OT</button>
+  </div>
+
   <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
   <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป + GPS)</button>
   <button id="checkinOT_SYMC">🔵 เข้างาน OT SYMC (กดบันทึกทันที)</button>
-  <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กดบันทึกทันที)</button>
+  <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กรอกรายละเอียดงาน)</button>
   <button id="checkinOT_ITEL">🟣 เข้างาน OT ITEL (กดบันทึกทันที)</button>
-  <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กดบันทึกทันที)</button>
+  <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กรอกรายละเอียดงาน)</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
@@ -164,14 +183,28 @@
 
       pendingType = type;
 
-      // 🔵/🟣 ถ้าเป็นลงเวลา OT: ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
-      if (type.includes('OT')) {
+      // 🔵/🟣 ถ้าเป็นเข้างาน OT: ส่งบันทึกทันที ไม่ต้องถ่ายรูป/GPS/กรอกงาน
+      if (type === 'เข้างาน OT SYMC' || type === 'เข้างาน OT ITEL') {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
         document.getElementById('preview').style.display = 'none';
         document.getElementById('reason-container').style.display = 'none';
+        document.getElementById('ot-details-container').style.display = 'none';
         
-        submitData("-", "-", "", "-");
+        submitData("-", "-", "", "-", "-");
+        return;
+      }
+
+      // 🟠/🟤 ถ้าเป็นเลิกงาน OT: ให้เปิดกล่องกรอกรายละเอียดงาน OT
+      if (type === 'เลิกงาน OT SYMC' || type === 'เลิกงาน OT ITEL') {
+        cachedImageBase64 = "";
+        document.getElementById('camera-container').style.display = 'none';
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('reason-container').style.display = 'none';
+        document.getElementById('ot-details-container').style.display = 'block';
+        document.getElementById('otDetails').value = ""; // ล้างค่าเดิม
+        hideAllButtons();
+        document.getElementById('status').innerText = '📝 กรุณากรอกรายละเอียดงาน OT ด้านบน';
         return;
       }
 
@@ -205,7 +238,7 @@
         hideAllButtons();
         document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:00 น. กรุณากรอกเหตุผลด้านบน';
       } else {
-        getLocationAndSubmit(cachedImageBase64, "-");
+        getLocationAndSubmit(cachedImageBase64, "-", "-");
       }
     }
 
@@ -217,7 +250,18 @@
         return;
       }
       document.getElementById('reason-container').style.display = 'none';
-      getLocationAndSubmit(cachedImageBase64, reasonText);
+      getLocationAndSubmit(cachedImageBase64, reasonText, "-");
+    };
+
+    // ปุ่มกดส่งรายละเอียดงาน OT
+    document.getElementById('submitOtDetailsBtn').onclick = () => {
+      const detailsText = document.getElementById('otDetails').value.trim();
+      if (!detailsText) {
+        alert("กรุณากรอกรายละเอียดงาน OT ก่อนดำเนินการต่อ");
+        return;
+      }
+      document.getElementById('ot-details-container').style.display = 'none';
+      submitData("-", "-", "", "-", detailsText);
     };
 
     function hideAllButtons() {
@@ -240,7 +284,7 @@
       document.getElementById('openExternal').style.display = 'block';
     }
 
-    function getLocationAndSubmit(imageBase64, reason) {
+    function getLocationAndSubmit(imageBase64, reason, otDetails) {
       document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
 
       if (!navigator.geolocation) {
@@ -261,7 +305,7 @@
         gpsFinished = true;
         clearTimeout(gpsTimeout);
         
-        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason);
+        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails);
       }, (err) => {
         if (gpsFinished) return;
         gpsFinished = true;
@@ -270,7 +314,7 @@
       }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
     }
 
-    async function submitData(lat, lng, imageBase64, reason) {
+    async function submitData(lat, lng, imageBase64, reason, otDetails) {
       document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
 
       let name = null;
@@ -303,7 +347,8 @@
           lat: lat,
           lng: lng,
           image: imageBase64,
-          reason: reason
+          reason: reason,
+          otDetails: otDetails || "-"
         };
 
         const res = await fetch(SCRIPT_URL, {
@@ -318,6 +363,9 @@
           let lineMsg = `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`;
           if (result.otFee && result.otFee !== '-') {
             lineMsg += `\n💰 ค่า OT: ${result.otFee}`;
+          }
+          if (otDetails && otDetails !== '-') {
+            lineMsg += `\n📝 รายละเอียดงาน: ${otDetails}`;
           }
           if (reason && reason !== '-') {
             lineMsg += `\n💬 เหตุผล: ${reason}`;
