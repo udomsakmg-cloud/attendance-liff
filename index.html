@@ -21,7 +21,7 @@
     #videoStream {
       width: 100%;
       display: block;
-      transform: scaleX(-1); /* สลับซ้ายขวาให้เหมือนกระจก (เฉพาะตอนมอง) */
+      transform: scaleX(-1); /* สลับซ้ายขวาให้เหมือนกระจก */
     }
     
     button {
@@ -41,11 +41,9 @@
 
   <!-- พื้นที่แสดงกล้องสด -->
   <div id="camera-container">
-    <!-- playsinline สำคัญมาก เพื่อไม่ให้วิดีโอเด้งเต็มจอในมือถือบางรุ่น -->
     <video id="videoStream" autoplay playsinline></video>
   </div>
   
-  <!-- Canvas ซ่อนไว้สำหรับแคปเจอร์ภาพจากวิดีโอ -->
   <canvas id="canvas" style="display: none;"></canvas>
   <img id="preview" alt="รูปที่ถ่าย">
   
@@ -56,7 +54,6 @@
   <div id="status">0) กำลังเตรียมระบบ...</div>
 
   <script>
-    // ดัก Error เผื่อไว้ดูข้อผิดพลาด
     window.onerror = function(msg, url, line) {
       document.getElementById('status').innerText = '❌ Error บรรทัด ' + line + ': ' + msg;
     };
@@ -69,11 +66,10 @@
     const video = document.getElementById('videoStream');
     const canvas = document.getElementById('canvas');
 
-    // ฟังก์ชันเปิดกล้องทันทีเมื่อโหลดหน้าเว็บ
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "user" }, // บังคับกล้องหน้า
+          video: { facingMode: "user" }, 
           audio: false 
         });
         video.srcObject = stream;
@@ -85,20 +81,18 @@
 
     document.getElementById('status').innerText = '1) กำลังโหลดระบบ...';
 
-    // โหลด LIFF
     if (typeof liff === 'undefined') {
       document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
     } else {
       liff.init({ liffId: LIFF_ID }).then(() => {
         liffReady = true;
         document.getElementById('status').innerText = '2) กำลังเปิดกล้อง...';
-        startCamera(); // เรียกเปิดกล้องเมื่อ LIFF พร้อม
+        startCamera();
       }).catch(err => {
         document.getElementById('status').innerText = '❌ liff.init error: ' + err.message;
       });
     }
 
-    // --- ส่วนปุ่มกดต่างๆ ---
     document.getElementById('checkin').onclick = () => takePhotoAndProcess('เข้างาน');
     document.getElementById('checkout').onclick = () => takePhotoAndProcess('เลิกงาน');
 
@@ -110,7 +104,6 @@
       }
     };
 
-    // ฟังก์ชันหลัก: แคปเจอร์ภาพ -> ดึง GPS -> ส่งข้อมูล
     function takePhotoAndProcess(type) {
       if (!liffReady) {
         alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
@@ -123,24 +116,19 @@
 
       pendingType = type;
 
-      // 1. แคปเจอร์ภาพจาก Video ลง Canvas
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      // พลิกภาพกลับมาให้เป็นปกติ (ไม่กลับซ้ายขวา) ก่อนเซฟ
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // แปลงเป็น Base64 (คุณภาพ 80% เพื่อลดขนาดไฟล์)
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
       
-      // ซ่อนวิดีโอ โชว์ภาพที่เพิ่งถ่ายค้างไว้
       document.getElementById('camera-container').style.display = 'none';
       document.getElementById('preview').src = imageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // 2. ไปดึง GPS และส่งข้อมูลต่อ
       getLocationAndSubmit(imageBase64);
     }
 
@@ -191,7 +179,6 @@
         name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
         if (!name || name.trim() === "") {
           document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
-          // กลับมาเปิดกล้องใหม่เผื่อกดพลาด
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
           return;
@@ -218,11 +205,12 @@
         if (result.success) {
           document.getElementById('status').innerText = '✅ ' + result.message;
           
+          // ส่งข้อความเข้าแชท LINE พร้อมแนบสถานะ (ปกติ/สาย)
           if (liffReady && liff.isInClient()) {
             liff.sendMessages([
               {
                 type: 'text',
-                text: `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nพนักงาน: ${name}`
+                text: `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`
               }
             ]).then(() => {
               liff.closeWindow();
@@ -230,11 +218,10 @@
               document.getElementById('status').innerText += '\n(เซฟสำเร็จ แต่ส่งแชทไม่ได้)';
             });
           } else {
-             alert(`✅ บันทึก${pendingType}เรียบร้อยแล้ว`);
+             alert(`✅ บันทึก${pendingType}เรียบร้อยแล้ว\nสถานะ: ${result.workStatus || '-'}`);
           }
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
-          // ถ้าพลาด เปิดกล้องคืน
           document.getElementById('camera-container').style.display = 'block';
           document.getElementById('preview').style.display = 'none';
         }
