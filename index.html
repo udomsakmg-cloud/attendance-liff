@@ -5,160 +5,274 @@
   <meta charset="UTF-8">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px 15px; background-color: #f4f6f9; }
-    h2 { margin-top: 0; color: #333; }
+    body { font-family: sans-serif; text-align: center; padding: 15px; background-color: #f4f6f9; margin: 0; }
     
+    /* แท็บเมนูสลับหน้า */
+    .tab-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 15px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 15px;
+      font-weight: bold;
+      border: none;
+      background: transparent;
+      color: #666;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #06C755;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
     /* กรอบวิดีโอกล้อง */
     #camera-container {
-      width: 100%;
-      max-width: 400px;
-      margin: 0 auto 15px auto;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #000;
+      width: 100%; max-width: 400px; margin: 0 auto 15px auto;
+      border-radius: 12px; overflow: hidden; background: #000;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    #videoStream {
-      width: 100%;
-      display: block;
-      transform: scaleX(-1);
-    }
+    #videoStream { width: 100%; display: block; transform: scaleX(-1); }
     
-    button {
-      width: 100%; padding: 15px; margin: 6px 0; font-size: 16px; font-weight: bold;
+    button.action-btn {
+      width: 100%; padding: 14px; margin: 5px 0; font-size: 15px; font-weight: bold;
       border: none; border-radius: 10px; color: white; cursor: pointer;
     }
-    #checkin { background: #06C755; }          /* เขียว */
-    #checkout { background: #FF5555; }         /* แดง */
-    #checkinOT_SYMC { background: #2b90d9; }    /* ฟ้า */
-    #checkoutOT_SYMC { background: #f39c12; }   /* ส้ม */
-    #checkinOT_ITEL { background: #8e44ad; }    /* ม่วง */
-    #checkoutOT_ITEL { background: #d35400; }   /* น้ำตาลส้ม */
-    #checkinOT_OTHER { background: #6c757d; }   /* เทา */
-    #checkoutOT_OTHER { background: #343a40; }  /* เทาเข้ม (OT อื่น) */
-    #openExternal { background: #888; font-size: 14px; padding: 12px; }
+    #checkin { background: #06C755; }
+    #checkout { background: #FF5555; }
+    #checkinOT_SYMC { background: #2b90d9; }
+    #checkoutOT_SYMC { background: #f39c12; }
+    #checkinOT_ITEL { background: #8e44ad; }
+    #checkoutOT_ITEL { background: #d35400; }
+    #checkinOT_OTHER { background: #6c757d; }
+    #checkoutOT_OTHER { background: #343a40; }
+    #openExternal { background: #888; font-size: 13px; padding: 10px; }
     
-    /* กล่องกรอกข้อมูล */
-    #reason-container, #ot-details-container, #other-ot-container {
-      display: none;
-      max-width: 400px;
-      margin: 15px auto;
-      background: #fff;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      text-align: left;
+    /* กรอบฟอร์มกรอกข้อมูล */
+    .form-box {
+      max-width: 400px; margin: 15px auto; background: #fff; padding: 15px;
+      border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: left;
     }
-    #reason-container label { font-weight: bold; color: #d9534f; display: block; margin-bottom: 8px; }
-    #ot-details-container label { font-weight: bold; color: #2b90d9; display: block; margin-bottom: 8px; }
-    #other-ot-container label { font-weight: bold; color: #343a40; display: block; margin-bottom: 8px; }
-
-    input[type="number"], textarea {
-      width: 100%;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-      font-size: 15px;
-      margin-bottom: 10px;
+    .form-box label { font-weight: bold; color: #333; display: block; margin-bottom: 5px; font-size: 14px; }
+    
+    input, select, textarea {
+      width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc;
+      box-sizing: border-box; font-size: 15px; margin-bottom: 12px;
     }
-    textarea { height: 80px; resize: none; margin-bottom: 0; }
+    textarea { height: 70px; resize: none; }
 
-    #submitReasonBtn { background: #f0ad4e; color: white; margin-top: 10px; }
-    #submitOtDetailsBtn { background: #2b90d9; color: white; margin-top: 10px; }
-    #submitOtherOtBtn { background: #343a40; color: white; margin-top: 10px; }
+    #submitLeaveBtn { background: #FF9900; color: white; margin-top: 5px; }
 
     #status { margin-top: 15px; font-size: 14px; white-space: pre-line; color: #333; font-weight: bold; }
     #preview { max-width: 100%; border-radius: 10px; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
-  <h2>📍 ลงเวลางาน</h2>
 
-  <!-- พื้นที่แสดงกล้องสด -->
-  <div id="camera-container">
-    <video id="videoStream" autoplay playsinline></video>
-  </div>
-  
-  <canvas id="canvas" style="display: none;"></canvas>
-  <img id="preview" alt="รูปที่ถ่าย">
-  
-  <!-- กล่องกรอกเหตุผลกรณีมาสาย -->
-  <div id="reason-container">
-    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:30 น.)</label>
-    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุเหตุผลความจำเป็นที่มาสาย:</p>
-    <textarea id="lateReason" placeholder="เช่น รถติด, ฝนตกหนัก, ติดภารกิจด่วน..."></textarea>
-    <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
+  <!-- ปุ่มสลับแท็บ -->
+  <div class="tab-container">
+    <button class="tab-btn active" onclick="switchTab('attendance')">📍 บันทึกเวลา / OT</button>
+    <button class="tab-btn" onclick="switchTab('leave')">📅 ขอลางาน</button>
   </div>
 
-  <!-- กล่องกรอกรายละเอียดงาน OT SYMC / ITEL -->
-  <div id="ot-details-container">
-    <label>📝 กรอกรายละเอียดงาน OT</label>
-    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุรายละเอียดงานที่ทำในการปฏิบัติงาน OT ครั้งนี้:</p>
-    <textarea id="otDetails" placeholder="เช่น ซ่อมบำรุงสายไฟเบอร์ออฟติก, ติดตั้งอุปกรณ์..."></textarea>
-    <button id="submitOtDetailsBtn">📤 ยืนยันการบันทึกเลิกงาน OT</button>
+  <!-- หน้าที่ 1: บันทึกเวลาเข้า-ออกงาน / OT -->
+  <div id="page-attendance" class="page active">
+    <h2>📍 ลงเวลางาน</h2>
+
+    <div id="camera-container">
+      <video id="videoStream" autoplay playsinline></video>
+    </div>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <img id="preview" alt="รูปที่ถ่าย">
+    
+    <!-- กล่องกรอกเหตุผลกรณีมาสาย -->
+    <div id="reason-container" class="form-box" style="display:none;">
+      <label style="color:#d9534f;">🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:30 น.)</label>
+      <textarea id="lateReason" placeholder="ระบุเหตุผลความจำเป็นที่มาสาย..."></textarea>
+      <button class="action-btn" style="background:#f0ad4e;" id="submitReasonBtn">📤 ยืนยันการส่งข้อมูล</button>
+    </div>
+
+    <!-- กล่องกรอกรายละเอียดงาน OT -->
+    <div id="ot-details-container" class="form-box" style="display:none;">
+      <label style="color:#2b90d9;">📝 รายละเอียดงาน OT</label>
+      <textarea id="otDetails" placeholder="ระบุรายละเอียดงานที่ทำในการปฏิบัติงาน OT..."></textarea>
+      <button class="action-btn" style="background:#2b90d9;" id="submitOtDetailsBtn">📤 ยืนยันเลิกงาน OT</button>
+    </div>
+
+    <!-- กล่องกรอก OT อื่น -->
+    <div id="other-ot-container" class="form-box" style="display:none;">
+      <label>⚙️ กรอกข้อมูล OT อื่น</label>
+      <input type="number" id="otCustomFee" placeholder="จำนวนเงิน OT (บาท)" min="0">
+      <textarea id="otOtherDetails" placeholder="เหตุผล / รายละเอียดงาน OT..."></textarea>
+      <button class="action-btn" style="background:#343a40;" id="submitOtherOtBtn">📤 ยืนยันบันทึก OT อื่น</button>
+    </div>
+
+    <button class="action-btn" id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
+    <button class="action-btn" id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป + GPS)</button>
+    <button class="action-btn" id="checkinOT_SYMC">🔵 เข้างาน OT SYMC</button>
+    <button class="action-btn" id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC</button>
+    <button class="action-btn" id="checkinOT_ITEL">🟣 เข้างาน OT ITEL</button>
+    <button class="action-btn" id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL</button>
+    <button class="action-btn" id="checkinOT_OTHER">⚪ เข้างาน OT อื่น</button>
+    <button class="action-btn" id="checkoutOT_OTHER">⚫ เลิกงาน OT อื่น</button>
   </div>
 
-  <!-- กล่องกรอกข้อมูล OT อื่น (ใส่เงินเอง + เหตุผล) -->
-  <div id="other-ot-container">
-    <label>⚙️ กรอกข้อมูล OT อื่น</label>
-    <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณากำหนดจำนวนเงินค่า OT และระบุเหตุผล/รายละเอียดงาน:</p>
-    <input type="number" id="otCustomFee" placeholder="จำนวนเงิน OT (บาท) เช่น 100, 300..." min="0">
-    <textarea id="otOtherDetails" placeholder="เหตุผล / รายละเอียดงาน OT ครั้งนี้..."></textarea>
-    <button id="submitOtherOtBtn">📤 ยืนยันการบันทึก OT อื่น</button>
+  <!-- หน้าที่ 2: ฟอร์มยื่นคำร้องขอลางาน -->
+  <div id="page-leave" class="page">
+    <h2>📅 ยื่นคำร้องขอลางาน</h2>
+    <div class="form-box">
+      <label>📌 ประเภทการลา</label>
+      <select id="leaveType">
+        <option value="ลากิจ">ลากิจ</option>
+        <option value="ลาป่วย">ลาป่วย</option>
+        <option value="ลาพักร้อน">ลาพักร้อน</option>
+        <option value="อื่น ๆ">อื่น ๆ</option>
+      </select>
+
+      <label>📅 วันที่เริ่มลา</label>
+      <input type="date" id="startDate">
+
+      <label>📅 วันที่สิ้นสุด</label>
+      <input type="date" id="endDate">
+
+      <label>📝 เหตุผลการลา</label>
+      <textarea id="leaveReason" placeholder="ระบุเหตุผลการขอลางาน..."></textarea>
+
+      <button class="action-btn" id="submitLeaveBtn">📤 ยื่นคำร้องขอลางาน</button>
+    </div>
   </div>
 
-  <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
-  <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป + GPS)</button>
-  <button id="checkinOT_SYMC">🔵 เข้างาน OT SYMC (กดบันทึกทันที)</button>
-  <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กรอกรายละเอียดงาน)</button>
-  <button id="checkinOT_ITEL">🟣 เข้างาน OT ITEL (กดบันทึกทันที)</button>
-  <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กรอกรายละเอียดงาน)</button>
-  <button id="checkinOT_OTHER">⚪ เข้างาน OT อื่น (กดบันทึกทันที)</button>
-  <button id="checkoutOT_OTHER">⚫ เลิกงาน OT อื่น (ใส่ค่า OT + เหตุผล)</button>
-  <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
-  
+  <button class="action-btn" id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   <div id="status">0) กำลังเตรียมระบบ...</div>
 
   <script>
-    window.onerror = function(msg, url, line) {
-      document.getElementById('status').innerText = '❌ Error บรรทัด ' + line + ': ' + msg;
-    };
-
     const LIFF_ID = '2010782987-4mjGpChs';
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZp93MR15Yc-haCY1BBVOmAW3KyYlN3mZq7_Bhu7qfiJtENrgJWF7dX9HUKyYOubSmGA/exec';
     
     let pendingType = null;
     let liffReady = false;
+    let userProfile = { displayName: null, userId: null };
     let cachedImageBase64 = "";
     const video = document.getElementById('videoStream');
     const canvas = document.getElementById('canvas');
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "user" }, 
-          audio: false 
-        });
-        video.srcObject = stream;
-        document.getElementById('status').innerText = '✅ ระบบพร้อมใช้งาน กดปุ่มเพื่อลงเวลาได้เลย';
-      } catch (err) {
-        document.getElementById('status').innerText = '⚠️ กล้องไม่พร้อมใช้งาน (หากลงเวลา OT ยังคงใช้งานได้ปกติ)';
+    // กำหนดวันที่เริ่มต้นให้เป็นวันปัจจุบัน
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = todayStr;
+    document.getElementById('endDate').value = todayStr;
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+
+      if (tabName === 'leave') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('page-leave').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('page-attendance').classList.add('active');
       }
     }
 
-    if (typeof liff === 'undefined') {
-      document.getElementById('status').innerText = '❌ โหลด LIFF SDK ไม่สำเร็จ';
-    } else {
+    // ตรวจสอบพารามิเตอร์ URL ว่าให้เปิดหน้าลาทันทีหรือไม่ (?page=leave)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('page') === 'leave') {
+      switchTab('leave');
+    }
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        video.srcObject = stream;
+        document.getElementById('status').innerText = '✅ ระบบพร้อมใช้งาน';
+      } catch (err) {
+        document.getElementById('status').innerText = '⚠️ กล้องไม่พร้อมใช้งาน (ระบบลางานใช้งานได้ปกติ)';
+      }
+    }
+
+    if (typeof liff !== 'undefined') {
       liff.init({ liffId: LIFF_ID }).then(() => {
         liffReady = true;
+        if (liff.isLoggedIn()) {
+          liff.getProfile().then(profile => {
+            userProfile.displayName = profile.displayName;
+            userProfile.userId = profile.userId;
+          });
+        }
         startCamera();
       }).catch(err => {
         document.getElementById('status').innerText = '❌ liff.init error: ' + err.message;
       });
     }
 
-    // ผูก Event ปุ่มกด
+    // ------------------ ระบบยื่นขอลางาน ------------------
+    document.getElementById('submitLeaveBtn').onclick = async () => {
+      const leaveType = document.getElementById('leaveType').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const reason = document.getElementById('leaveReason').value.trim();
+
+      if (!startDate || !endDate) {
+        alert("กรุณาระบุช่วงวันที่ลาให้ครบถ้วน");
+        return;
+      }
+      if (startDate > endDate) {
+        alert("วันที่เริ่มลา ต้องไม่เกิน วันที่สิ้นสุด");
+        return;
+      }
+      if (!reason) {
+        alert("กรุณาระบุเหตุผลการลา");
+        return;
+      }
+
+      let name = userProfile.displayName;
+      if (!name) {
+        name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
+        if (!name || !name.trim()) return;
+      }
+
+      document.getElementById('status').innerText = '⏳ กำลังส่งคำร้องขอลางาน...';
+
+      try {
+        const payload = {
+          action: 'requestLeave',
+          name: name,
+          userId: userProfile.userId || '-',
+          leaveType: leaveType,
+          startDate: startDate,
+          endDate: endDate,
+          reason: reason
+        };
+
+        const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const result = await res.json();
+
+        if (result.success) {
+          alert('✅ ' + result.message);
+          if (liffReady && liff.isInClient()) {
+            liff.closeWindow();
+          } else {
+            location.reload();
+          }
+        } else {
+          document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
+        }
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
+      }
+    };
+
+    // ------------------ ระบบลงเวลางาน/OT เดิม ------------------
     document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
     document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
     document.getElementById('checkinOT_SYMC').onclick = () => processAttendance('เข้างาน OT SYMC');
@@ -171,265 +285,93 @@
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
         liff.openWindow({ url: window.location.href, external: true });
-      } else {
-        document.getElementById('status').innerText = 'หน้านี้เปิดอยู่นอก LINE แล้ว';
       }
     };
 
     function processAttendance(type) {
-      if (!liffReady) {
-        alert("ระบบยังไม่พร้อมใช้งาน กรุณารอสักครู่");
-        return;
-      }
-
+      if (!liffReady) { alert("ระบบยังไม่พร้อมใช้งาน"); return; }
       pendingType = type;
 
-      // ⚪ เข้างาน OT (SYMC / ITEL / อื่นๆ): ส่งบันทึกทันที
-      if (type === 'เข้างาน OT SYMC' || type === 'เข้างาน OT ITEL' || type === 'เข้างาน OT อื่น') {
-        cachedImageBase64 = "";
-        document.getElementById('camera-container').style.display = 'none';
-        document.getElementById('preview').style.display = 'none';
-        document.getElementById('reason-container').style.display = 'none';
-        document.getElementById('ot-details-container').style.display = 'none';
-        document.getElementById('other-ot-container').style.display = 'none';
-        
+      if (type.indexOf('เข้างาน OT') !== -1) {
         submitData("-", "-", "", "-", "-", null);
         return;
       }
-
-      // 🟠/🟤 เลิกงาน OT SYMC / ITEL
       if (type === 'เลิกงาน OT SYMC' || type === 'เลิกงาน OT ITEL') {
-        cachedImageBase64 = "";
-        document.getElementById('camera-container').style.display = 'none';
-        document.getElementById('preview').style.display = 'none';
-        document.getElementById('reason-container').style.display = 'none';
-        document.getElementById('other-ot-container').style.display = 'none';
         document.getElementById('ot-details-container').style.display = 'block';
-        document.getElementById('otDetails').value = "";
-        hideAllButtons();
-        document.getElementById('status').innerText = '📝 กรุณากรอกรายละเอียดงาน OT ด้านบน';
         return;
       }
-
-      // ⚫ เลิกงาน OT อื่น (กรอกเงินเอง + เหตุผล)
       if (type === 'เลิกงาน OT อื่น') {
-        cachedImageBase64 = "";
-        document.getElementById('camera-container').style.display = 'none';
-        document.getElementById('preview').style.display = 'none';
-        document.getElementById('reason-container').style.display = 'none';
-        document.getElementById('ot-details-container').style.display = 'none';
         document.getElementById('other-ot-container').style.display = 'block';
-        document.getElementById('otCustomFee').value = "";
-        document.getElementById('otOtherDetails').value = "";
-        hideAllButtons();
-        document.getElementById('status').innerText = '⚙️ กรุณากรอกจำนวนเงินค่า OT และเหตุผลด้านบน';
         return;
       }
 
-      // 🟢/🔴 งานปกติ: ถ่ายรูป + ดึง GPS
-      if (!video.srcObject) {
-        alert("ไม่พบสัญญาณกล้อง กรุณาอนุญาตให้ใช้งานกล้อง");
-        return;
-      }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+      ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
       cachedImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-      
-      document.getElementById('camera-container').style.display = 'none';
-      document.getElementById('preview').src = cachedImageBase64;
-      document.getElementById('preview').style.display = 'block';
 
       const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTime = `${hours}:${minutes}`;
-
-      if (type === 'เข้างาน' && currentTime > "08:30") {
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (type === 'เข้างาน' && timeStr > "08:30") {
         document.getElementById('reason-container').style.display = 'block';
-        hideAllButtons();
-        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:30 น. กรุณากรอกเหตุผลด้านบน';
       } else {
         getLocationAndSubmit(cachedImageBase64, "-", "-");
       }
     }
 
-    // ส่งเหตุผลกรณีมาสาย
     document.getElementById('submitReasonBtn').onclick = () => {
-      const reasonText = document.getElementById('lateReason').value.trim();
-      if (!reasonText) {
-        alert("กรุณากรอกเหตุผลการมาสายก่อนดำเนินการต่อ");
-        return;
-      }
+      const reason = document.getElementById('lateReason').value.trim();
+      if (!reason) { alert("กรุณากรอกเหตุผล"); return; }
       document.getElementById('reason-container').style.display = 'none';
-      getLocationAndSubmit(cachedImageBase64, reasonText, "-");
+      getLocationAndSubmit(cachedImageBase64, reason, "-");
     };
 
-    // ส่งรายละเอียดงาน OT SYMC / ITEL
     document.getElementById('submitOtDetailsBtn').onclick = () => {
-      const detailsText = document.getElementById('otDetails').value.trim();
-      if (!detailsText) {
-        alert("กรุณากรอกรายละเอียดงาน OT ก่อนดำเนินการต่อ");
-        return;
-      }
+      const details = document.getElementById('otDetails').value.trim();
+      if (!details) { alert("กรุณากรอกรายละเอียดงาน"); return; }
       document.getElementById('ot-details-container').style.display = 'none';
-      submitData("-", "-", "", "-", detailsText, null);
+      submitData("-", "-", "", "-", details, null);
     };
 
-    // ส่งข้อมูล OT อื่น (เงิน + เหตุผล)
     document.getElementById('submitOtherOtBtn').onclick = () => {
-      const customFee = document.getElementById('otCustomFee').value.trim();
-      const detailsText = document.getElementById('otOtherDetails').value.trim();
-      
-      if (!customFee || isNaN(customFee) || parseFloat(customFee) <= 0) {
-        alert("กรุณากรอกจำนวนเงินค่า OT ให้ถูกต้อง (ต้องมากกว่า 0)");
-        return;
-      }
-      if (!detailsText) {
-        alert("กรุณากรอกเหตุผล / รายละเอียดงาน OT");
-        return;
-      }
-
+      const fee = document.getElementById('otCustomFee').value.trim();
+      const details = document.getElementById('otOtherDetails').value.trim();
+      if (!fee || parseFloat(fee) <= 0 || !details) { alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
       document.getElementById('other-ot-container').style.display = 'none';
-      submitData("-", "-", "", "-", detailsText, parseFloat(customFee));
+      submitData("-", "-", "", "-", details, parseFloat(fee));
     };
-
-    function hideAllButtons() {
-      document.getElementById('checkin').style.display = 'none';
-      document.getElementById('checkout').style.display = 'none';
-      document.getElementById('checkinOT_SYMC').style.display = 'none';
-      document.getElementById('checkoutOT_SYMC').style.display = 'none';
-      document.getElementById('checkinOT_ITEL').style.display = 'none';
-      document.getElementById('checkoutOT_ITEL').style.display = 'none';
-      document.getElementById('checkinOT_OTHER').style.display = 'none';
-      document.getElementById('checkoutOT_OTHER').style.display = 'none';
-      document.getElementById('openExternal').style.display = 'none';
-    }
-
-    function showAllButtons() {
-      document.getElementById('checkin').style.display = 'block';
-      document.getElementById('checkout').style.display = 'block';
-      document.getElementById('checkinOT_SYMC').style.display = 'block';
-      document.getElementById('checkoutOT_SYMC').style.display = 'block';
-      document.getElementById('checkinOT_ITEL').style.display = 'block';
-      document.getElementById('checkoutOT_ITEL').style.display = 'block';
-      document.getElementById('checkinOT_OTHER').style.display = 'block';
-      document.getElementById('checkoutOT_OTHER').style.display = 'block';
-      document.getElementById('openExternal').style.display = 'block';
-    }
 
     function getLocationAndSubmit(imageBase64, reason, otDetails) {
-      document.getElementById('status').innerText = '📍 กำลังค้นหาตำแหน่ง GPS...';
-
-      if (!navigator.geolocation) {
-        document.getElementById('status').innerText = '❌ เบราว์เซอร์นี้ไม่รองรับ GPS';
-        return;
-      }
-
-      let gpsFinished = false;
-      const gpsTimeout = setTimeout(() => {
-        if (!gpsFinished) {
-          gpsFinished = true;
-          document.getElementById('status').innerText = '❌ ค้นหาพิกัด GPS นานเกินไป กรุณากดปุ่มเปิดภายนอก';
-        }
-      }, 10000);
-
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        if (gpsFinished) return;
-        gpsFinished = true;
-        clearTimeout(gpsTimeout);
-        
-        await submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails, null);
-      }, (err) => {
-        if (gpsFinished) return;
-        gpsFinished = true;
-        clearTimeout(gpsTimeout);
+      document.getElementById('status').innerText = '📍 กำลังค้นหาพิกัด GPS...';
+      navigator.geolocation.getCurrentPosition(pos => {
+        submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails, null);
+      }, err => {
         document.getElementById('status').innerText = `❌ GPS error: ${err.message}`;
-      }, { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 });
+      }, { enableHighAccuracy: true, timeout: 9000 });
     }
 
     async function submitData(lat, lng, imageBase64, reason, otDetails, customOtFee) {
-      document.getElementById('status').innerText = '👤 กำลังดึงข้อมูลโปรไฟล์...';
+      let name = userProfile.displayName || prompt('กรุณาพิมพ์ชื่อ-นามสกุล:');
+      if (!name) return;
 
-      let name = null;
-      try {
-        if (liffReady && liff.isLoggedIn && liff.isLoggedIn()) {
-          const profile = await liff.getProfile();
-          name = profile.displayName;
-        }
-      } catch (err) { name = null; }
-
-      if (!name) {
-        name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:');
-        if (!name || name.trim() === "") {
-          document.getElementById('status').innerText = '❌ ยกเลิก: ไม่ได้กรอกชื่อ';
-          document.getElementById('camera-container').style.display = 'block';
-          document.getElementById('preview').style.display = 'none';
-          showAllButtons();
-          return;
-        }
-      }
-
-      document.getElementById('status').innerText = '⏳ กำลังส่งข้อมูลเข้าระบบ...';
-
+      document.getElementById('status').innerText = '⏳ กำลังบันทึกข้อมูล...';
       try {
         const payload = {
-          name: name,
-          type: pendingType,
-          lat: lat,
-          lng: lng,
-          image: imageBase64,
-          reason: reason,
-          otDetails: otDetails || "-",
-          customOtFee: customOtFee || null
+          name: name, type: pendingType, lat: lat, lng: lng,
+          image: imageBase64, reason: reason, otDetails: otDetails || "-", customOtFee: customOtFee
         };
-
-        const res = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
+        const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
         const result = await res.json();
 
         if (result.success) {
-          document.getElementById('status').innerText = '✅ ' + result.message;
-          
-          let lineMsg = `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`;
-          if (result.otFee && result.otFee !== '-') {
-            lineMsg += `\n💰 ค่า OT: ${result.otFee}`;
-          }
-          if (otDetails && otDetails !== '-') {
-            lineMsg += `\n📝 รายละเอียด/เหตุผล: ${otDetails}`;
-          }
-          if (reason && reason !== '-') {
-            lineMsg += `\n💬 เหตุผลมาสาย: ${reason}`;
-          }
-
-          if (liffReady && liff.isInClient()) {
-            liff.sendMessages([{ type: 'text', text: lineMsg }]).then(() => {
-              liff.closeWindow();
-            }).catch((err) => {
-              document.getElementById('status').innerText += '\n(เซฟสำเร็จ แต่ส่งแชทไม่ได้)';
-            });
-          } else {
-             alert(lineMsg);
-          }
+          alert('✅ ' + result.message);
+          if (liffReady && liff.isInClient()) liff.closeWindow();
         } else {
           document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
-          document.getElementById('camera-container').style.display = 'block';
-          document.getElementById('preview').style.display = 'none';
-          showAllButtons();
         }
-
       } catch (err) {
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
-        document.getElementById('camera-container').style.display = 'block';
-        document.getElementById('preview').style.display = 'none';
-        showAllButtons();
       }
     }
   </script>
