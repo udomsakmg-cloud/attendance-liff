@@ -97,7 +97,7 @@
   
   <!-- กล่องกรอกเหตุผลกรณีมาสาย -->
   <div id="reason-container">
-    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:00 น.)</label>
+    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:30 น.)</label>
     <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุเหตุผลความจำเป็นที่มาสาย:</p>
     <textarea id="lateReason" placeholder="เช่น รถติด, ฝนตกหนัก, ติดภารกิจด่วน..."></textarea>
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
@@ -183,7 +183,7 @@
 
       pendingType = type;
 
-      // 🔵/🟣 ถ้าเป็นเข้างาน OT: ส่งบันทึกทันที ไม่ต้องถ่ายรูป/GPS/กรอกงาน
+      // 🔵/🟣 ถ้าเป็นเข้างาน OT: ส่งบันทึกทันที
       if (type === 'เข้างาน OT SYMC' || type === 'เข้างาน OT ITEL') {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
@@ -195,14 +195,14 @@
         return;
       }
 
-      // 🟠/🟤 ถ้าเป็นเลิกงาน OT: ให้เปิดกล่องกรอกรายละเอียดงาน OT
+      // 🟠/🟤 ถ้าเป็นเลิกงาน OT: กรอกรายละเอียดงาน OT
       if (type === 'เลิกงาน OT SYMC' || type === 'เลิกงาน OT ITEL') {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
         document.getElementById('preview').style.display = 'none';
         document.getElementById('reason-container').style.display = 'none';
         document.getElementById('ot-details-container').style.display = 'block';
-        document.getElementById('otDetails').value = ""; // ล้างค่าเดิม
+        document.getElementById('otDetails').value = "";
         hideAllButtons();
         document.getElementById('status').innerText = '📝 กรุณากรอกรายละเอียดงาน OT ด้านบน';
         return;
@@ -227,16 +227,16 @@
       document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // เช็คเวลาเข้างานสายสำหรับงานปกติ (เวลาทำงานคือ 08:00)
+      // เช็คเวลาเข้างานสายสำหรับงานปกติ (เวลาเกณฑ์เข้างานปกติคือ เกิน 08:30 น.)
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
 
-      if (type === 'เข้างาน' && currentTime > "08:00") {
+      if (type === 'เข้างาน' && currentTime > "08:30") {
         document.getElementById('reason-container').style.display = 'block';
         hideAllButtons();
-        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:00 น. กรุณากรอกเหตุผลด้านบน';
+        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:30 น. กรุณากรอกเหตุผลด้านบน';
       } else {
         getLocationAndSubmit(cachedImageBase64, "-", "-");
       }
