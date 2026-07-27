@@ -28,10 +28,12 @@
       width: 100%; padding: 15px; margin: 6px 0; font-size: 16px; font-weight: bold;
       border: none; border-radius: 10px; color: white; cursor: pointer;
     }
-    #checkin { background: #06C755; }     /* เขียว */
-    #checkout { background: #FF5555; }    /* แดง */
-    #checkinOT { background: #2b90d9; }   /* ฟ้า */
-    #checkoutOT { background: #f39c12; }  /* ส้ม */
+    #checkin { background: #06C755; }          /* เขียว */
+    #checkout { background: #FF5555; }         /* แดง */
+    #checkinOT_SYMC { background: #2b90d9; }    /* ฟ้า */
+    #checkoutOT_SYMC { background: #f39c12; }   /* ส้ม */
+    #checkinOT_ITEL { background: #8e44ad; }    /* ม่วง */
+    #checkoutOT_ITEL { background: #d35400; }   /* น้ำตาลส้ม */
     #openExternal { background: #888; font-size: 14px; padding: 12px; }
     
     /* กล่องกรอกเหตุผลกรณีมาสาย */
@@ -92,8 +94,10 @@
 
   <button id="checkin">✅ เข้างานปกติ (ถ่ายรูป + GPS)</button>
   <button id="checkout">🔴 เลิกงานปกติ (ถ่ายรูป + GPS)</button>
-  <button id="checkinOT">🔵 เข้างาน OT (กดบันทึกทันที)</button>
-  <button id="checkoutOT">🟠 เลิกงาน OT (กดบันทึกทันที)</button>
+  <button id="checkinOT_SYMC">🔵 เข้างาน OT SYMC (กดบันทึกทันที)</button>
+  <button id="checkoutOT_SYMC">🟠 เลิกงาน OT SYMC (กดบันทึกทันที)</button>
+  <button id="checkinOT_ITEL">🟣 เข้างาน OT ITEL (กดบันทึกทันที)</button>
+  <button id="checkoutOT_ITEL">🟤 เลิกงาน OT ITEL (กดบันทึกทันที)</button>
   <button id="openExternal">🌐 เปิดด้วยเบราว์เซอร์ภายนอก</button>
   
   <div id="status">0) กำลังเตรียมระบบ...</div>
@@ -139,8 +143,10 @@
     // ผูก Event ให้แต่ละปุ่ม
     document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
     document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
-    document.getElementById('checkinOT').onclick = () => processAttendance('เข้างาน OT');
-    document.getElementById('checkoutOT').onclick = () => processAttendance('เลิกงาน OT');
+    document.getElementById('checkinOT_SYMC').onclick = () => processAttendance('เข้างาน OT SYMC');
+    document.getElementById('checkoutOT_SYMC').onclick = () => processAttendance('เลิกงาน OT SYMC');
+    document.getElementById('checkinOT_ITEL').onclick = () => processAttendance('เข้างาน OT ITEL');
+    document.getElementById('checkoutOT_ITEL').onclick = () => processAttendance('เลิกงาน OT ITEL');
 
     document.getElementById('openExternal').onclick = () => {
       if (liffReady && liff.isInClient()) {
@@ -158,7 +164,7 @@
 
       pendingType = type;
 
-      // 🔵 ถ้าเป็นลงเวลา OT: ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
+      // 🔵/🟣 ถ้าเป็นลงเวลา OT (SYMC หรือ ITEL): ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
       if (type.includes('OT')) {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
@@ -217,16 +223,20 @@
     function hideAllButtons() {
       document.getElementById('checkin').style.display = 'none';
       document.getElementById('checkout').style.display = 'none';
-      document.getElementById('checkinOT').style.display = 'none';
-      document.getElementById('checkoutOT').style.display = 'none';
+      document.getElementById('checkinOT_SYMC').style.display = 'none';
+      document.getElementById('checkoutOT_SYMC').style.display = 'none';
+      document.getElementById('checkinOT_ITEL').style.display = 'none';
+      document.getElementById('checkoutOT_ITEL').style.display = 'none';
       document.getElementById('openExternal').style.display = 'none';
     }
 
     function showAllButtons() {
       document.getElementById('checkin').style.display = 'block';
       document.getElementById('checkout').style.display = 'block';
-      document.getElementById('checkinOT').style.display = 'block';
-      document.getElementById('checkoutOT').style.display = 'block';
+      document.getElementById('checkinOT_SYMC').style.display = 'block';
+      document.getElementById('checkoutOT_SYMC').style.display = 'block';
+      document.getElementById('checkinOT_ITEL').style.display = 'block';
+      document.getElementById('checkoutOT_ITEL').style.display = 'block';
       document.getElementById('openExternal').style.display = 'block';
     }
 
