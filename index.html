@@ -86,7 +86,7 @@
   
   <!-- กล่องกรอกเหตุผลกรณีมาสาย -->
   <div id="reason-container">
-    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 09:00 น.)</label>
+    <label>🔴 ตรวจพบว่าคุณมาสาย (หลัง 08:00 น.)</label>
     <p style="font-size: 13px; color: #666; margin-top: 0;">กรุณาระบุเหตุผลความจำเป็นที่มาสาย:</p>
     <textarea id="lateReason" placeholder="เช่น รถติด, ฝนตกหนัก, ติดภารกิจด่วน..."></textarea>
     <button id="submitReasonBtn">📤 ยืนยันการส่งข้อมูลพร้อมเหตุผล</button>
@@ -164,7 +164,7 @@
 
       pendingType = type;
 
-      // 🔵/🟣 ถ้าเป็นลงเวลา OT (SYMC หรือ ITEL): ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
+      // 🔵/🟣 ถ้าเป็นลงเวลา OT: ข้ามกล้อง และ ข้าม GPS ส่งบันทึกทันที!
       if (type.includes('OT')) {
         cachedImageBase64 = "";
         document.getElementById('camera-container').style.display = 'none';
@@ -194,16 +194,16 @@
       document.getElementById('preview').src = cachedImageBase64;
       document.getElementById('preview').style.display = 'block';
 
-      // เช็คเวลาเข้างานสายสำหรับงานปกติ
+      // เช็คเวลาเข้างานสายสำหรับงานปกติ (เวลาทำงานคือ 08:00)
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
 
-      if (type === 'เข้างาน' && currentTime > "09:00") {
+      if (type === 'เข้างาน' && currentTime > "08:00") {
         document.getElementById('reason-container').style.display = 'block';
         hideAllButtons();
-        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 09:00 น. กรุณากรอกเหตุผลด้านบน';
+        document.getElementById('status').innerText = '⚠️ คุณลงเวลาเข้างานหลัง 08:00 น. กรุณากรอกเหตุผลด้านบน';
       } else {
         getLocationAndSubmit(cachedImageBase64, "-");
       }
@@ -316,6 +316,9 @@
           document.getElementById('status').innerText = '✅ ' + result.message;
           
           let lineMsg = `✅ บันทึก${pendingType}เรียบร้อยแล้ว\nเวลา: ${new Date().toLocaleTimeString('th-TH')}\nสถานะ: ${result.workStatus || '-'}\nพนักงาน: ${name}`;
+          if (result.otFee && result.otFee !== '-') {
+            lineMsg += `\n💰 ค่า OT: ${result.otFee}`;
+          }
           if (reason && reason !== '-') {
             lineMsg += `\n💬 เหตุผล: ${reason}`;
           }
