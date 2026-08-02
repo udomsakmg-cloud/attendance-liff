@@ -339,11 +339,27 @@
       getLocationAndSubmit(cachedImageBase64, reason, "-");
     };
 
+    // 🟢 ส่วนที่ปรับปรุงเพิ่มเติม: ตรวจสอบการทำ OT วันอาทิตย์
     document.getElementById('submitOtDetailsBtn').onclick = () => {
       const details = document.getElementById('otDetails').value.trim();
       if (!details) { alert("กรุณากรอกรายละเอียดงาน"); return; }
       document.getElementById('ot-details-container').style.display = 'none';
-      submitData("-", "-", "", "-", details, null);
+      
+      // ดึงวันปัจจุบัน (0 = วันอาทิตย์, 1 = จันทร์, ..., 6 = เสาร์)
+      const currentDay = new Date().getDay();
+      let autoOtFee = null;
+      
+      // ถ้าเป็นวันอาทิตย์ ให้กำหนดค่า OT ตามประเภท
+      if (currentDay === 0) {
+        if (pendingType === 'เลิกงาน OT SYMC') {
+          autoOtFee = 200;
+        } else if (pendingType === 'เลิกงาน OT ITEL') {
+          autoOtFee = 150;
+        }
+      }
+      
+      // ส่งค่า autoOtFee ไปแทนที่ null
+      submitData("-", "-", "", "-", details, autoOtFee);
     };
 
     document.getElementById('submitOtherOtBtn').onclick = () => {
