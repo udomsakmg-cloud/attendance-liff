@@ -7,18 +7,18 @@
   <style>
     body { font-family: sans-serif; text-align: center; padding: 15px; background-color: #f4f6f9; margin: 0; }
     
-    /* แท็บเมนูสลับหน้า */
     .tab-container { display: flex; justify-content: center; margin-bottom: 15px; background: #e0e0e0; border-radius: 10px; padding: 4px; }
     .tab-btn { flex: 1; padding: 10px; font-size: 15px; font-weight: bold; border: none; background: transparent; color: #666; border-radius: 8px; cursor: pointer; }
     .tab-btn.active { background: #ffffff; color: #06C755; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .page { display: none; }
     .page.active { display: block; }
 
-    /* กรอบวิดีโอกล้อง */
     #camera-container { width: 100%; max-width: 400px; margin: 0 auto 15px auto; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     #videoStream { width: 100%; display: block; transform: scaleX(-1); }
     
     button.action-btn { width: 100%; padding: 14px; margin: 5px 0; font-size: 15px; font-weight: bold; border: none; border-radius: 10px; color: white; cursor: pointer; }
+    button:disabled { background-color: #ccc !important; cursor: not-allowed; }
+    
     #checkin { background: #06C755; }
     #checkout { background: #FF5555; }
     #checkinOT_SYMC { background: #2b90d9; }
@@ -29,7 +29,6 @@
     #checkoutOT_OTHER { background: #343a40; }
     #openExternal { background: #888; font-size: 13px; padding: 10px; }
     
-    /* กรอบฟอร์มกรอกข้อมูล */
     .form-box { max-width: 400px; margin: 15px auto; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: left; }
     .form-box label { font-weight: bold; color: #333; display: block; margin-bottom: 5px; font-size: 14px; }
     input, select, textarea { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 15px; margin-bottom: 12px; }
@@ -41,13 +40,11 @@
 </head>
 <body>
 
-  <!-- ปุ่มสลับแท็บ -->
   <div class="tab-container">
     <button class="tab-btn active" onclick="switchTab('attendance')">📍 บันทึกเวลา / OT</button>
     <button class="tab-btn" onclick="switchTab('leave')">📅 ขอลางาน</button>
   </div>
 
-  <!-- หน้าที่ 1: บันทึกเวลาเข้า-ออกงาน / OT -->
   <div id="page-attendance" class="page active">
     <h2>📍 ลงเวลางาน</h2>
 
@@ -86,7 +83,6 @@
     <button class="action-btn" id="checkoutOT_OTHER">⚫ เลิกงาน OT อื่น</button>
   </div>
 
-  <!-- หน้าที่ 2: ฟอร์มยื่นคำร้องขอลางาน -->
   <div id="page-leave" class="page">
     <h2>📅 ยื่นคำร้องขอลางาน</h2>
     <div class="form-box">
@@ -116,6 +112,7 @@
     
     let pendingType = null;
     let liffReady = false;
+    let isSubmitting = false; // ป้องกันการกดปุ่มซ้ำขณะรอนำส่งข้อมูล
     let userProfile = { displayName: null, userId: null };
     let cachedImageBase64 = "";
     const video = document.getElementById('videoStream');
@@ -165,26 +162,15 @@
       });
     }
 
-    // 🟢 ตรวจสอบการกดซ้ำ และแจ้งเตือนว่าบันทึกเรียบร้อยแล้ว
-    function checkCooldown(type) {
-      const key = 'lastRecordTime_' + (userProfile.userId || 'guest') + '_' + type;
-      const lastSaveTime = localStorage.getItem(key);
-      
-      if (lastSaveTime) {
-        const now = new Date().getTime();
-        const diff = now - parseInt(lastSaveTime);
-        const cooldownMs = 30 * 60 * 1000; // 30 นาที
-        
-        if (diff < cooldownMs) {
-          const remainMins = Math.ceil((cooldownMs - diff) / 60000);
-          alert(`✅ รายการ "${type}" ได้ทำการบันทึกเรียบร้อยแล้ว\n\n(หากต้องการลงเวลาซ้ำ กรุณารออีกประมาณ ${remainMins} นาที)`);
-          return false; // ระงับการทำรายการ
-        }
-      }
-      return true; // ทำรายการได้ปกติ
+    function toggleButtons(disabled) {
+      isSubmitting = disabled;
+      document.querySelectorAll('button.action-btn').forEach(btn => {
+        btn.disabled = disabled;
+      });
     }
 
     document.getElementById('submitLeaveBtn').onclick = async () => {
+      if (isSubmitting) return;
       const leaveType = document.getElementById('leaveType').value;
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
@@ -197,6 +183,7 @@
       let name = userProfile.displayName;
       if (!name) { name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:'); if (!name || !name.trim()) return; }
 
+      toggleButtons(true);
       document.getElementById('status').innerText = '⏳ กำลังส่งคำร้องขอลางาน...';
 
       try {
@@ -210,11 +197,17 @@
             let msgText = "📅 ยื่นคำร้อง" + leaveType + "เรียบร้อยแล้ว\nพนักงาน: " + name + "\nวันที่: " + startDate + " ถึง " + endDate + "\n💬 เหตุผล: " + reason;
             liff.sendMessages([{ type: 'text', text: msgText }]).then(() => liff.closeWindow()).catch(() => liff.closeWindow());
           } else { location.reload(); }
-        } else { document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message; }
-      } catch (err) { document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message; }
+        } else { 
+          alert('❌ ' + result.message);
+          document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message; 
+          toggleButtons(false);
+        }
+      } catch (err) { 
+        document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message; 
+        toggleButtons(false);
+      }
     };
 
-    // ------------------ ระบบลงเวลางาน/OT ------------------
     document.getElementById('checkin').onclick = () => processAttendance('เข้างาน');
     document.getElementById('checkout').onclick = () => processAttendance('เลิกงาน');
     document.getElementById('checkinOT_SYMC').onclick = () => processAttendance('เข้างาน OT SYMC');
@@ -230,9 +223,7 @@
 
     function processAttendance(type) {
       if (!liffReady) { alert("ระบบยังไม่พร้อมใช้งาน"); return; }
-      
-      // 🟢 เช็ค Cooldown ก่อนทำรายการ
-      if (!checkCooldown(type)) return; 
+      if (isSubmitting) return; // ป้องกันการกดรัวซ้ำขณะกำลังทำงาน
 
       pendingType = type;
 
@@ -269,7 +260,7 @@
       
       const currentDay = new Date().getDay();
       let autoOtFee = null;
-      if (currentDay === 0) { // วันอาทิตย์ (0)
+      if (currentDay === 0) {
         if (pendingType === 'เลิกงาน OT SYMC') { autoOtFee = 200; } 
         else if (pendingType === 'เลิกงาน OT ITEL') { autoOtFee = 150; }
       }
@@ -285,18 +276,21 @@
     };
 
     function getLocationAndSubmit(imageBase64, reason, otDetails) {
+      toggleButtons(true);
       document.getElementById('status').innerText = '📍 กำลังค้นหาพิกัด GPS...';
       navigator.geolocation.getCurrentPosition(pos => {
         submitData(pos.coords.latitude, pos.coords.longitude, imageBase64, reason, otDetails, null);
       }, err => {
         document.getElementById('status').innerText = `❌ GPS error: ${err.message}`;
+        toggleButtons(false);
       }, { enableHighAccuracy: true, timeout: 9000 });
     }
 
     async function submitData(lat, lng, imageBase64, reason, otDetails, customOtFee) {
       let name = userProfile.displayName || prompt('กรุณาพิมพ์ชื่อ-นามสกุล:');
-      if (!name) return;
+      if (!name) { toggleButtons(false); return; }
 
+      toggleButtons(true);
       document.getElementById('status').innerText = '⏳ กำลังบันทึกข้อมูล...';
       try {
         const payload = { name: name, type: pendingType, lat: lat, lng: lng, image: imageBase64, reason: reason, otDetails: otDetails || "-", customOtFee: customOtFee };
@@ -304,11 +298,6 @@
         const result = await res.json();
 
         if (result.success) {
-          
-          // 🟢 เก็บเวลาล่าสุดของปุ่มประเภทนี้ลงในเครื่องเพื่อเริ่มนับ Cooldown 30 นาที
-          const key = 'lastRecordTime_' + (userProfile.userId || 'guest') + '_' + pendingType;
-          localStorage.setItem(key, new Date().getTime());
-
           alert('✅ ' + result.message);
           
           if (liffReady && liff.isInClient()) {
@@ -322,10 +311,14 @@
              location.reload();
           }
         } else {
-          document.getElementById('status').innerText = '❌ เกิดข้อผิดพลาด: ' + result.message;
+          // หากติดเงื่อนไขบันทึกซ้ำ ให้ขึ้น Alert แจ้งทันที
+          alert(result.message);
+          document.getElementById('status').innerText = '⚠️ ' + result.message;
+          toggleButtons(false);
         }
       } catch (err) {
         document.getElementById('status').innerText = '❌ ส่งข้อมูลไม่สำเร็จ: ' + err.message;
+        toggleButtons(false);
       }
     }
   </script>
