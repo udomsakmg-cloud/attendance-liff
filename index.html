@@ -112,7 +112,7 @@
     
     let pendingType = null;
     let liffReady = false;
-    let isSubmitting = false; // ป้องกันการกดปุ่มซ้ำขณะรอนำส่งข้อมูล
+    let isSubmitting = false; 
     let userProfile = { displayName: null, userId: null };
     let cachedImageBase64 = "";
     const video = document.getElementById('videoStream');
@@ -170,7 +170,7 @@
     }
 
     // ==========================================
-    // ยื่นคำร้องขอลางาน (Optimistic UI)
+    // ยื่นคำร้องขอลางาน (หน่วงเวลา 3 วินาที)
     // ==========================================
     document.getElementById('submitLeaveBtn').onclick = async () => {
       if (isSubmitting) return;
@@ -187,17 +187,21 @@
       if (!name) { name = prompt('กรุณาพิมพ์ชื่อ-นามสกุลของคุณ:'); if (!name || !name.trim()) return; }
 
       toggleButtons(true);
+      document.getElementById('status').innerText = '⏳ กำลังประมวลผลข้อมูล...';
 
-      // --- Optimistic UI: แจ้งบันทึกสำเร็จทันที ---
+      // --- หน่วงเวลา 3 วินาที ---
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // --- แจ้งบันทึกสำเร็จหลังครบ 3 วินาที ---
       alert('✅ บันทึกสำเร็จแล้ว');
-      document.getElementById('status').innerText = '✅ บันทึกสำเร็จแล้ว (กำลังส่งข้อมูลเข้าระบบ...)';
+      document.getElementById('status').innerText = '✅ บันทึกสำเร็จแล้ว (กำลังนำส่งข้อมูลเข้าระบบ...)';
 
       if (liffReady && liff.isInClient()) {
         let msgText = "📅 ยื่นคำร้อง" + leaveType + "เรียบร้อยแล้ว\nพนักงาน: " + name + "\nวันที่: " + startDate + " ถึง " + endDate + "\n💬 เหตุผล: " + reason;
         liff.sendMessages([{ type: 'text', text: msgText }]).catch(() => {});
       }
 
-      // --- ทำการประมวลผลหลังบ้านใน Background ---
+      // --- ประมวลผลส่งข้อมูลไปยังเซิร์ฟเวอร์ ---
       try {
         const payload = { action: 'requestLeave', name: name, userId: userProfile.userId || '-', leaveType: leaveType, startDate: startDate, endDate: endDate, reason: reason };
         const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -298,17 +302,21 @@
     }
 
     // ==========================================
-    // บันทึกเวลาลงงาน / OT (Optimistic UI)
+    // บันทึกเวลาลงงาน / OT (หน่วงเวลา 3 วินาที)
     // ==========================================
     async function submitData(lat, lng, imageBase64, reason, otDetails, customOtFee) {
       let name = userProfile.displayName || prompt('กรุณาพิมพ์ชื่อ-นามสกุล:');
       if (!name) { toggleButtons(false); return; }
 
       toggleButtons(true);
+      document.getElementById('status').innerText = '⏳ กำลังประมวลผลข้อมูล...';
 
-      // --- Optimistic UI: แจ้งบันทึกสำเร็จทันที ---
+      // --- หน่วงเวลา 3 วินาที ---
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // --- แจ้งบันทึกสำเร็จหลังครบ 3 วินาที ---
       alert('✅ บันทึกสำเร็จแล้ว');
-      document.getElementById('status').innerText = '✅ บันทึกสำเร็จแล้ว (กำลังส่งข้อมูลเข้าระบบ...)';
+      document.getElementById('status').innerText = '✅ บันทึกสำเร็จแล้ว (กำลังนำส่งข้อมูลเข้าระบบ...)';
 
       if (liffReady && liff.isInClient()) {
         const currentTime = new Date().toLocaleTimeString('th-TH', { hour12: false });
@@ -319,7 +327,7 @@
         liff.sendMessages([{ type: 'text', text: msgText }]).catch(() => {});
       }
 
-      // --- ทำการประมวลผลหลังบ้านใน Background ---
+      // --- ประมวลผลส่งข้อมูลไปยังเซิร์ฟเวอร์ ---
       try {
         const payload = { name: name, type: pendingType, lat: lat, lng: lng, image: imageBase64, reason: reason, otDetails: otDetails || "-", customOtFee: customOtFee };
         const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -330,7 +338,6 @@
             liff.closeWindow();
           }
         } else {
-          // หากเกิดข้อผิดพลาดจากฝั่ง Apps Script (เช่น ตรวจพบลงเวลาซ้ำ) ให้แจ้งเตือนผู้ใช้งานย้อนหลัง
           alert('⚠️ ข้อความจากระบบ: ' + result.message);
           document.getElementById('status').innerText = '⚠️ ' + result.message;
           toggleButtons(false);
